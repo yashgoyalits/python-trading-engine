@@ -1,0 +1,13 @@
+[project]
+name = "project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fyers-apiv3>=3.1.11",
+    "numpy>=2.4.4",
+    "rich>=14.3.3",
+    "uvloop>=0.22.1",
+]
