@@ -6,9 +6,9 @@ from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
+from src.broker.fyers.order_placement import FyersOrderPlacement   # ← updated
 from src.managers.candle_builder import CandleBuilder
 from src.managers.active_trades import ActiveTradesManager
-from src.managers.order_placement_manager import FyersOrderPlacement
 from src.strategies.strategy_one.handler import StrategyHandler
 
 
@@ -17,34 +17,44 @@ async def main():
     syms   = SymbolRegistry()
     logger = ShmLogger(shm)
 
-    # Register symbols
     syms.register("NSE:NIFTY50-INDEX")
 
     loop = asyncio.get_running_loop()
 
-    data_broker  = FyersDataBroker(shm, syms, logger)
-    order_broker = FyersOrderBroker(shm, logger)
+    # ── 1. Init all three brokers ──────────────────────────────
+    data_broker     = FyersDataBroker(shm, syms, logger)
+    order_broker    = FyersOrderBroker(shm, logger)
+    order_placement = FyersOrderPlacement()
 
+    # ── 2. Connect all three together ─────────────────────────
     data_broker.connect(loop)
     order_broker.connect(loop)
+    await order_placement.connect()          # TCP pool + TLS warmup
 
-    # Wait for connections
+    # ── 3. Wait for WS connections ────────────────────────────
     while not data_broker.is_connected():
         await asyncio.sleep(0.1)
     logger.info("Data WS ready")
 
+    while not order_broker.is_connected():
+        await asyncio.sleep(0.1)
+    logger.info("Order WS ready")
+
+    logger.info(f"Order placement ready: {order_placement.is_connected()}")
+
+    # ── 4. Subscribe ──────────────────────────────────────────
     data_broker.subscribe(["NSE:NIFTY50-INDEX"])
 
+    # ── 5. Build managers / strategy ──────────────────────────
     candles = CandleBuilder(
         shm, syms,
         watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
         logger=logger,
     )
 
-    trades    = ActiveTradesManager(shm, "STRATEGY_ONE")
-    placement = FyersOrderPlacement()
-    strategy  = StrategyHandler(
-        shm, syms, trades, placement, logger,
+    trades   = ActiveTradesManager(shm, "STRATEGY_ONE")
+    strategy = StrategyHandler(
+        shm, syms, trades, order_placement, logger,
         strategy_id="STRATEGY_ONE",
         sym_name="NSE:NIFTY50-INDEX",
         max_trades=1,
@@ -60,6 +70,7 @@ async def main():
     finally:
         data_broker.disconnect()
         order_broker.disconnect()
+        await order_placement.disconnect()   # ← clean close
         shm.cleanup()
         logger.info("Engine stopped")
 

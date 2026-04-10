@@ -7,7 +7,7 @@ from src.core.dtypes import (
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
 from src.managers.active_trades import ActiveTradesManager
-from src.managers.order_placement_manager import FyersOrderPlacement
+from src.broker.fyers.order_placement import FyersOrderPlacement
 from src.strategies.strategy_one.trailing import TrailingManager
 from src.strategies.strategy_one.logic import StrategyLogicManager
 
