@@ -1,5 +1,5 @@
 from src.managers.active_trades import ActiveTradesManager
-from src.managers.order_placement_manager import FyersOrderPlacement
+from src.broker.fyers.order_placement import FyersOrderPlacement
 from src.infrastructure.logger import ShmLogger
 
 
