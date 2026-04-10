@@ -35,80 +35,107 @@ class StrategyHandler:
         self._trailing = TrailingManager(trades, placement, logger)
         self._logic    = StrategyLogicManager()
 
-        # Last-seen seq counters — no queue
         self._last_candle_seq = 0
         self._last_tick_seq   = 0
         self._last_order_seq  = 0
 
+        self._tasks: list[asyncio.Task] = []
+
+    # ── lifecycle ──────────────────────────────────────────────
+
     async def run(self):
-        await asyncio.gather(
-            self._candle_loop(),
-            self._tick_loop(),
-            self._order_loop(),
-        )
+        self._tasks = [
+            asyncio.create_task(self._candle_loop(), name="candle"),
+            asyncio.create_task(self._tick_loop(),   name="tick"),
+            asyncio.create_task(self._order_loop(),  name="order"),
+        ]
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._log.info(f"[{self._sid}] All tasks done: {[t.get_name() for t in self._tasks]}")
+
+    def _stop_all(self):
+        for t in self._tasks:
+            if not t.done():
+                t.cancel()
 
     # ── candle loop ────────────────────────────────────────────
 
     async def _candle_loop(self):
-        base = self._sym_idx * MAX_CANDLE_HISTORY
+        base  = self._sym_idx * MAX_CANDLE_HISTORY
         first = True
-        while True:
-            cur = int(self._shm.ctrl[self._sym_idx]['c30s_seq'])
-            if cur != self._last_candle_seq:
-                if first:
-                    first = False
+        try:
+            while True:
+                cur = int(self._shm.ctrl[self._sym_idx]['c30s_seq'])
+                if cur != self._last_candle_seq:
+                    if first:
+                        first = False
+                        self._last_candle_seq = cur
+                        await asyncio.sleep(0)
+                        continue
+
                     self._last_candle_seq = cur
-                    await asyncio.sleep(0)
-                    continue
+                    widx   = int(self._shm.ctrl[self._sym_idx]['c30s_widx'])
+                    cidx   = (widx - 1) % MAX_CANDLE_HISTORY
+                    candle = self._shm.candles_30s[base + cidx]
 
-                self._last_candle_seq = cur
-                widx   = int(self._shm.ctrl[self._sym_idx]['c30s_widx'])
-                # Latest closed candle is one slot before current write index
-                cidx   = (widx - 1) % MAX_CANDLE_HISTORY
-                candle = self._shm.candles_30s[base + cidx]  # direct view
+                    if self._done >= self._max:
+                        self._log.info(
+                            f"[{self._sid}] Max trade limit reached: {self._done}. Stopping all loops."
+                        )
+                        self._stop_all()
+                        return
 
-                trade = self._trades.get_active()
-                if trade is None and self._done < self._max:
-                    if self._logic.check_entry(candle):
-                        await self._enter()
+                    trade = self._trades.get_active()
+                    if trade is None:
+                        if self._logic.check_entry(candle):
+                            await self._enter()
 
-            await asyncio.sleep(0)
+                await asyncio.sleep(0)
+
+        except asyncio.CancelledError:
+            self._log.info(f"[{self._sid}] candle_loop cancelled.")
 
     # ── tick loop ──────────────────────────────────────────────
 
     async def _tick_loop(self):
         tick_base = self._sym_idx * 200
-        while True:
-            cur = int(self._shm.ctrl[self._sym_idx]['tick_seq'])
-            if cur != self._last_tick_seq:
-                self._last_tick_seq = cur
-                widx = int(self._shm.ctrl[self._sym_idx]['tick_widx'])
-                tick = self._shm.ticks[tick_base + (widx - 1) % 200]
+        try:
+            while True:
+                cur = int(self._shm.ctrl[self._sym_idx]['tick_seq'])
+                if cur != self._last_tick_seq:
+                    self._last_tick_seq = cur
+                    widx = int(self._shm.ctrl[self._sym_idx]['tick_widx'])
+                    tick = self._shm.ticks[tick_base + (widx - 1) % 200]
 
-                trade = self._trades.get_active()
-                if trade is not None:
-                    await self._trailing.check(tick, trade)
+                    trade = self._trades.get_active()
+                    if trade is not None:
+                        await self._trailing.check(tick, trade)
 
-            await asyncio.sleep(0)
+                await asyncio.sleep(0)
+
+        except asyncio.CancelledError:
+            self._log.info(f"[{self._sid}] tick_loop cancelled.")
 
     # ── order loop ─────────────────────────────────────────────
 
     async def _order_loop(self):
         last_processed_seq = 0
-        while True:
-            ctrl_seq = int(self._shm.order_ctrl[0]['seq'])
-            if ctrl_seq != self._last_order_seq:
-                # Process all new orders since last check
-                widx = int(self._shm.order_ctrl[0]['widx'])
-                for i in range(MAX_ORDERS):
-                    slot = self._shm.orders[i]
-                    s = int(slot['seq'])
-                    if s > last_processed_seq:
-                        await self._process_order(slot)
-                        last_processed_seq = max(last_processed_seq, s)
-                self._last_order_seq = ctrl_seq
+        try:
+            while True:
+                ctrl_seq = int(self._shm.order_ctrl[0]['seq'])
+                if ctrl_seq != self._last_order_seq:
+                    widx = int(self._shm.order_ctrl[0]['widx'])
+                    for i in range(MAX_ORDERS):
+                        slot = self._shm.orders[i]
+                        s    = int(slot['seq'])
+                        if s > last_processed_seq:
+                            await self._process_order(slot)
+                            last_processed_seq = max(last_processed_seq, s)
+                    self._last_order_seq = ctrl_seq
 
-            await asyncio.sleep(0)
+                await asyncio.sleep(0)
+
+        except asyncio.CancelledError:
+            self._log.info(f"[{self._sid}] order_loop cancelled.")
 
     # ── helpers ────────────────────────────────────────────────
 
@@ -120,7 +147,7 @@ class StrategyHandler:
         if res.get('code') == 1101:
             self._done += 1
             self._trades.add_trade(self._done, res.get("id", ""))
-            self._log.info(f"Order placed {res.get('id')}")
+            self._log.info(f"[{self._sid}] Order placed {res.get('id')}")
 
     async def _process_order(self, order):
         trade = self._trades.get_active()
@@ -134,7 +161,7 @@ class StrategyHandler:
         trade_id = trade['order_id'].decode().rstrip('\x00')
 
         if oid == trade_id and otype == 2 and status == 2:
-            self._log.info(f"Parent filled: {oid}")
+            self._log.info(f"[{self._sid}] Parent filled: {oid}")
             self._trades.update(
                 trade_id,
                 qty=int(order['qty']),
@@ -153,9 +180,12 @@ class StrategyHandler:
                     target_price=float(order['limit_price']),
                 )
             if status == 2:
-                self._log.info(f"Child filled, closing trade: {oid} | ParentID: {trade_id}")
+                self._log.info(
+                    f"[{self._sid}] Child filled, closing trade: {oid} | ParentID: {trade_id}"
+                )
                 self._trades.close_trade(trade_id)
 
             if status == 1:
-                self._log.info(f"Order cancelled ID: {oid} | ParentID: {trade_id}")
-                
+                self._log.info(
+                    f"[{self._sid}] Order cancelled ID: {oid} | ParentID: {trade_id}"
+                )
