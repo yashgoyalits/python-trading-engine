@@ -157,34 +157,47 @@ class StrategyHandler:
         oid      = order['order_id'].decode().rstrip('\x00')
         pid      = order['parent_id'].decode().rstrip('\x00')
         status   = int(order['status'])
-        otype    = int(order['order_type'])
         trade_id = trade['order_id'].decode().rstrip('\x00')
 
-        if oid == trade_id and otype == 2 and status == 2:
-            self._log.info(f"[{self._sid}] Parent filled: {oid}")
-            self._trades.update(
-                trade_id,
-                qty=int(order['qty']),
-                entry_price=float(order['limit_price']),
-            )
+        self._log.info(f"Order UPDATES: {order}")
 
+        # Parent 
+        if oid == trade_id:
+            # Transit
+            if status == 4:
+                self._log.info(f"[{self._sid}] Parent transit: {oid}")
+            # Filled
+            if status == 2:
+                self._log.info(f"[{self._sid}] Parent filled: {oid}")
+                self._trades.update(
+                    trade_id,
+                    qty=int(order['qty']),
+                    entry_price=float(order['limit_price']),
+                )
+
+        # Child
         if pid == trade_id:
-            if otype == 4 and status == 6:
+            # Transit
+            if status == 4:
+                self._log.info(f"[{self._sid}] Child transit: {oid}")
+            # Pending
+            if status == 6:
                 self._trades.update(trade_id,
                     stop_order_id=oid,
                     stop_price=float(order['stop_price']),
                 )
-            if otype == 1 and status == 6:
+            if status == 6:
                 self._trades.update(trade_id,
                     target_order_id=oid,
                     target_price=float(order['limit_price']),
                 )
+            # Filled
             if status == 2:
                 self._log.info(
                     f"[{self._sid}] Child filled, closing trade: {oid} | ParentID: {trade_id}"
                 )
                 self._trades.close_trade(trade_id)
-
+            # Cancelled
             if status == 1:
                 self._log.info(
                     f"[{self._sid}] Order cancelled ID: {oid} | ParentID: {trade_id}"
