@@ -39,22 +39,26 @@ class ActiveTradesManager:
         self._active_slot    = slot_i           # cache it
 
     def update(self, order_id: str, **kwargs):
-        r = self._get_by_id(order_id)           # O(1) dict lookup
-        if r is None:
+        slot_i = self._idx.get(order_id)
+        if slot_i is None:
             return
+        r = self._buf[slot_i]
+
         for k, v in kwargs.items():
+
             if k == 'trailing_levels':
                 for i, lvl in enumerate(v[:MAX_TRAILING]):
                     r['trailing'][i]['threshold'] = lvl['threshold']
                     r['trailing'][i]['new_stop']  = lvl['new_stop']
                     r['trailing'][i]['hit']       = lvl.get('hit', False)
                 r['trailing_count'] = len(v)
-            elif k in ('order_id', 'stop_order_id', 'target_order_id', 'symbol', 'strategy_id'):
-                if k == 'order_id' and v != order_id:
-                    # order_id change hone pe index update karo
-                    self._idx.pop(order_id, None)
-                    self._idx[v] = self._idx.get(order_id, self._active_slot)
-                r[k] = (v or '').encode()[:64]
+
+            elif k in ('stop_order_id', 'target_order_id'):
+                r[k] = v.encode()[:64]
+
+            elif k in ('symbol', 'strategy_id'):
+                r[k] = v.encode()[:32]
+
             else:
                 r[k] = v
 
