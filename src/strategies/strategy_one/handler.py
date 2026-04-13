@@ -77,17 +77,21 @@ class StrategyHandler:
                     cidx   = (widx - 1) % MAX_CANDLE_HISTORY
                     candle = self._shm.candles_30s[base + cidx]
 
-                    if self._done >= self._max:
-                        self._log.info(
-                            f"[{self._sid}] Max trade limit reached: {self._done}. Stopping all loops."
-                        )
-                        self._stop_all()
-                        return
-
                     trade = self._trades.get_active()
+
+                    # Active Trade Check
                     if trade is None:
+                        # Max Trade Check
+                        if self._done >= self._max:
+                            self._log.info(
+                                f"[{self._sid}] Max trade limit reached: {self._done}. Stopping all loops."
+                            )
+                            self._stop_all()
+                            return
+
                         if self._logic.check_entry(candle):
                             await self._enter()
+                    # else: trade chal rahi hai, candle loop kuch nahi karta — tick/order loop handle karenge
 
                 await asyncio.sleep(0)
 
