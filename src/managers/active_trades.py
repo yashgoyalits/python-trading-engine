@@ -1,19 +1,25 @@
+from collections import deque
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ACTIVE_TRADES, MAX_TRAILING
-
 
 class ActiveTradesManager:
     def __init__(self, shm: ShmStore, strategy_id: str):
         self._buf = shm.trades
         self._sid = strategy_id.encode()
 
+        # ── in-process indexes (O(1) lookup) ──────────────────
+        self._free: deque[int] = deque(range(MAX_ACTIVE_TRADES))  # free slot pool
+        self._idx:  dict[str, int] = {}   # order_id → slot index
+        self._active_slot: int | None = None  # cached active slot for this strategy
+
     # ── write ops ─────────────────────────────────────────────
 
     def add_trade(self, trade_no: int, order_id: str):
-        slot = self._free_slot()
-        if slot is None:
+        if not self._free:
             raise RuntimeError("MAX_ACTIVE_TRADES reached")
-        r = self._buf[slot]
+
+        slot_i = self._free.popleft()           # O(1)
+        r = self._buf[slot_i]
         r['active']          = True
         r['trade_no']        = trade_no
         r['strategy_id']     = self._sid
@@ -29,8 +35,11 @@ class ActiveTradesManager:
         r['trailing_count']  = 0
         r['trailing'][:]['hit'] = False
 
+        self._idx[order_id]  = slot_i           # register in index
+        self._active_slot    = slot_i           # cache it
+
     def update(self, order_id: str, **kwargs):
-        r = self._find(order_id)
+        r = self._get_by_id(order_id)           # O(1) dict lookup
         if r is None:
             return
         for k, v in kwargs.items():
@@ -41,35 +50,40 @@ class ActiveTradesManager:
                     r['trailing'][i]['hit']       = lvl.get('hit', False)
                 r['trailing_count'] = len(v)
             elif k in ('order_id', 'stop_order_id', 'target_order_id', 'symbol', 'strategy_id'):
+                if k == 'order_id' and v != order_id:
+                    # order_id change hone pe index update karo
+                    self._idx.pop(order_id, None)
+                    self._idx[v] = self._idx.get(order_id, self._active_slot)
                 r[k] = (v or '').encode()[:64]
             else:
                 r[k] = v
 
     def close_trade(self, order_id: str):
-        r = self._find(order_id)
-        if r is not None:
-            r['active'] = False
+        slot_i = self._idx.pop(order_id, None)  # O(1)
+        if slot_i is None:
+            return
+        self._buf[slot_i]['active'] = False
+        self._free.append(slot_i)               # slot wapas pool mein
+        self._active_slot = None
 
-    # ── read ops (return view — zero copy) ────────────────────
+    # ── read ops ──────────────────────────────────────────────
 
     def get_active(self):
-        """Returns numpy row view. Caller reads fields directly — no object created."""
-        for i in range(MAX_ACTIVE_TRADES):
-            if self._buf[i]['active'] and self._buf[i]['strategy_id'] == self._sid:
-                return self._buf[i]
+        """O(1) — cached slot, no loop, no decode."""
+        if self._active_slot is None:
+            return None
+        row = self._buf[self._active_slot]
+        if row['active']:
+            return row
+        # stale cache (e.g. external close) — invalidate
+        self._active_slot = None
         return None
 
     # ── internal ──────────────────────────────────────────────
 
-    def _find(self, order_id: str):
-        oid = order_id.encode()
-        for i in range(MAX_ACTIVE_TRADES):
-            if self._buf[i]['active'] and self._buf[i]['order_id'] == oid:
-                return self._buf[i]
-        return None
-
-    def _free_slot(self):
-        for i in range(MAX_ACTIVE_TRADES):
-            if not self._buf[i]['active']:
-                return i
-        return None
+    def _get_by_id(self, order_id: str):
+        """O(1) dict lookup instead of O(n) loop."""
+        slot_i = self._idx.get(order_id)
+        if slot_i is None:
+            return None
+        return self._buf[slot_i]
