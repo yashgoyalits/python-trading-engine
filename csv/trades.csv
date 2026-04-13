@@ -1,0 +1,2 @@
+trade_no,strategy_id,symbol,side,qty,entry_price,stop_price,target_price,order_id,stop_order_id,target_order_id,closed_at
+1,STRATEGY_ONE,NSE:IDEA-EQ,0,1,9.26,8.76,10.17,26041300392317-BO-1,26041300392318-BO-2,26041300392319-BO-3,1776068623.7401237

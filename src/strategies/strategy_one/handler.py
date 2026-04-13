@@ -10,6 +10,7 @@ from src.managers.active_trades import ActiveTradesManager
 from src.broker.fyers.order_placement import FyersOrderPlacement
 from src.strategies.strategy_one.trailing import TrailingManager
 from src.strategies.strategy_one.logic import StrategyLogicManager
+from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
 
 class StrategyHandler:
@@ -34,6 +35,7 @@ class StrategyHandler:
         self._done     = 0
         self._trailing = TrailingManager(trades, placement, logger)
         self._logic    = StrategyLogicManager()
+        self._csv      = TradeCSVLogger("trades.csv")
 
         self._last_candle_seq = 0
         self._last_tick_seq   = 0
@@ -197,6 +199,7 @@ class StrategyHandler:
                 self._log.info(
                     f"[{self._sid}] | Child filled | Order ID: {oid} | ParentID: {trade_id}"
                 )
+                self._csv.log_close(trade)
                 self._trades.close_trade(trade_id)
             if status == 1:
                 self._log.info(
