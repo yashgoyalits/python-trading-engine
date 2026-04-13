@@ -153,6 +153,7 @@ class StrategyHandler:
             self._trades.add_trade(self._done, res.get("id", ""))
             self._log.info(f"[{self._sid}] Order placed {res.get('id')}")
 
+    
     async def _process_order(self, order):
         trade = self._trades.get_active()
         if trade is None:
@@ -161,35 +162,43 @@ class StrategyHandler:
         oid      = order['order_id'].decode().rstrip('\x00')
         pid      = order['parent_id'].decode().rstrip('\x00')
         status   = int(order['status'])
+        order_type = int(order['order_type'])
         trade_id = trade['order_id'].decode().rstrip('\x00')
 
-        # Parent
+        # ── Parent ─────────────────────────────────────────────────
         if oid == trade_id:
-            if status == 4:
-                self._log.info(f"[{self._sid}] Parent transit: {oid}")
             if status == 2:
-                self._log.info(f"[{self._sid}] Parent filled: {oid}")
+                self._log.info(f"[{self._sid}] | Parent filled | Order ID: {oid}")
                 self._trades.update(
                     trade_id,
+                    symbol=order['symbol'].decode().rstrip('\x00'),
                     qty=int(order['qty']),
-                    entry_price=float(order['limit_price']),
+                    entry_price=float(order['traded_price']),
                 )
+            return  # ← parent handle ho gaya, child block skip karo
 
-        # Child
+        # ── Child ──────────────────────────────────────────────────
         if pid == trade_id:
-            if status == 4:
-                self._log.info(f"[{self._sid}] Child transit: {oid}")
-            if status == 6:
-                self._trades.update(trade_id,
-                    stop_order_id=oid,
-                    stop_price=float(order['stop_price']),
-                )
+            if status == 6 and order_type == 4:  # STOP LOSS
+                if oid != trade['stop_order_id'].tobytes().rstrip(b'\x00').decode():
+                    self._log.info(f"[{self._sid}] | Child stop loss update")
+                    self._trades.update(trade_id,
+                        stop_order_id=oid,
+                        stop_price=float(order['stop_price']),
+                    )
+            if status == 6 and order_type == 1:  # TAKE PROFIT
+                if oid != trade['target_order_id'].tobytes().rstrip(b'\x00').decode():
+                    self._log.info(f"[{self._sid}] | Child take profit update")
+                    self._trades.update(trade_id,
+                        target_order_id=oid,
+                        target_price=float(order['limit_price']),
+                    )
             if status == 2:
                 self._log.info(
-                    f"[{self._sid}] Child filled, closing trade: {oid} | ParentID: {trade_id}"
+                    f"[{self._sid}] | Child filled | Order ID: {oid} | ParentID: {trade_id}"
                 )
                 self._trades.close_trade(trade_id)
             if status == 1:
                 self._log.info(
-                    f"[{self._sid}] Order cancelled ID: {oid} | ParentID: {trade_id}"
+                    f"[{self._sid}] | Child cancelled | Order ID: {oid} | ParentID: {trade_id}"
                 )
