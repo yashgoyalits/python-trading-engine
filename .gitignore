@@ -15,3 +15,5 @@ wheels/
 *.log
 
 plan.md
+
+csv/
