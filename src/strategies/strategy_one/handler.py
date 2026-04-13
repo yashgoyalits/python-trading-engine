@@ -163,8 +163,6 @@ class StrategyHandler:
         status   = int(order['status'])
         trade_id = trade['order_id'].decode().rstrip('\x00')
 
-        self._log.info(f"Order UPDATES: {order}")
-
         # Parent 
         if oid == trade_id:
             # Transit
@@ -189,11 +187,6 @@ class StrategyHandler:
                 self._trades.update(trade_id,
                     stop_order_id=oid,
                     stop_price=float(order['stop_price']),
-                )
-            if status == 6:
-                self._trades.update(trade_id,
-                    target_order_id=oid,
-                    target_price=float(order['limit_price']),
                 )
             # Filled
             if status == 2:
