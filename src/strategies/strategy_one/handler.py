@@ -163,12 +163,10 @@ class StrategyHandler:
         status   = int(order['status'])
         trade_id = trade['order_id'].decode().rstrip('\x00')
 
-        # Parent 
+        # Parent
         if oid == trade_id:
-            # Transit
             if status == 4:
                 self._log.info(f"[{self._sid}] Parent transit: {oid}")
-            # Filled
             if status == 2:
                 self._log.info(f"[{self._sid}] Parent filled: {oid}")
                 self._trades.update(
@@ -179,22 +177,18 @@ class StrategyHandler:
 
         # Child
         if pid == trade_id:
-            # Transit
             if status == 4:
                 self._log.info(f"[{self._sid}] Child transit: {oid}")
-            # Pending
             if status == 6:
                 self._trades.update(trade_id,
                     stop_order_id=oid,
                     stop_price=float(order['stop_price']),
                 )
-            # Filled
             if status == 2:
                 self._log.info(
                     f"[{self._sid}] Child filled, closing trade: {oid} | ParentID: {trade_id}"
                 )
                 self._trades.close_trade(trade_id)
-            # Cancelled
             if status == 1:
                 self._log.info(
                     f"[{self._sid}] Order cancelled ID: {oid} | ParentID: {trade_id}"
