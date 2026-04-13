@@ -41,9 +41,18 @@ class CandleBuilder:
                 self._last_tick_seq[sym_idx] = cur_seq
 
                 # Read latest tick (widx points to NEXT write slot, so -1 is latest)
-                widx = int(self._shm.ctrl[sym_idx]['tick_widx'])
-                latest = (widx - 1) % MAX_TICKS_PER_SYMBOL
-                tick = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + latest]
+                # Reader seqlock
+                ctrl = self._shm.ctrl[sym_idx]
+                while True:
+                    s1 = int(ctrl['tick_seq'])
+                    if s1 % 2 == 1:
+                        continue
+                    widx   = int(ctrl['tick_widx'])
+                    latest = (widx - 1) % MAX_TICKS_PER_SYMBOL
+                    tick   = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + latest].copy()
+                    s2     = int(ctrl['tick_seq'])
+                    if s1 == s2:
+                        break
 
                 ts  = float(tick['timestamp'])
                 ltp = float(tick['ltp'])

@@ -74,18 +74,23 @@ class FyersOrderBroker:
         widx = int(ctrl['widx'])
         slot = self._shm.orders[widx]
 
-        slot['status']       = o.get("status", 0)
-        slot['order_type']   = o.get("type", 0)
-        slot['side']         = o.get("side", 0)
-        slot['qty']          = o.get("qty", 0)
-        slot['stop_price']   = o.get("stopPrice", 0.0)
-        slot['limit_price']  = o.get("limitPrice", 0.0)
-        slot['traded_price'] = o.get("tradedPrice", 0.0)
-        slot['order_id']     = (o.get("id", "") or "").encode()[:64]
-        slot['parent_id']    = (o.get("parentId", "") or "").encode()[:64]
-        slot['symbol']       = (o.get("symbol", "") or "").encode()[:32]
-        slot['order_datetime'] = o.get("orderDateTime", "").encode()[:32]
+        # ── SEQLOCK WRITER START ──────────────────────────────
+        ctrl['seq'] += 1              # odd → "busy"
+        # ─────────────────────────────────────────────────────
 
+        slot['status']         = o.get("status", 0)
+        slot['order_type']     = o.get("type", 0)
+        slot['side']           = o.get("side", 0)
+        slot['qty']            = o.get("qty", 0)
+        slot['stop_price']     = o.get("stopPrice", 0.0)
+        slot['limit_price']    = o.get("limitPrice", 0.0)
+        slot['traded_price']   = o.get("tradedPrice", 0.0)
+        slot['order_id']       = (o.get("id", "") or "").encode()[:64]
+        slot['parent_id']      = (o.get("parentId", "") or "").encode()[:64]
+        slot['symbol']         = (o.get("symbol", "") or "").encode()[:32]
+        slot['order_datetime'] = o.get("orderDateTime", "").encode()[:32]
+        slot['seq']            = int(ctrl['seq'])
+
+        # ── SEQLOCK WRITER END ───────────────────────────────
+        ctrl['seq'] += 1              # even → "ready"
         ctrl['widx'] = (widx + 1) % MAX_ORDERS
-        ctrl['seq'] += 1
-        slot['seq'] = int(ctrl['seq'])
