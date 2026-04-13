@@ -66,6 +66,7 @@ ORDER_DTYPE = np.dtype([
     ('order_id',     'S64'),
     ('parent_id',    'S64'),
     ('symbol',       'S32'),
+    ('order_datetime',   'S32'),
 ])
 
 TRAILING_DTYPE = np.dtype([

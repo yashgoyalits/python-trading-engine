@@ -84,6 +84,7 @@ class FyersOrderBroker:
         slot['order_id']     = (o.get("id", "") or "").encode()[:64]
         slot['parent_id']    = (o.get("parentId", "") or "").encode()[:64]
         slot['symbol']       = (o.get("symbol", "") or "").encode()[:32]
+        slot['order_datetime'] = o.get("orderDateTime", "").encode()[:32]
 
         ctrl['widx'] = (widx + 1) % MAX_ORDERS
         ctrl['seq'] += 1
