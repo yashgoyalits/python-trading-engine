@@ -26,8 +26,6 @@ async def main():
     order_broker = FyersOrderBroker(shm, logger)
 
     # ── 2. Executor (strategy-facing layer) ───────────────────
-    # Kal broker badlna ho toh sirf yahan swap karo:
-    #   executor = ZerodhaExecutor()
     executor = LiveExecutor()
 
     # ── 3. Connect all ────────────────────────────────────────
@@ -79,11 +77,3 @@ async def main():
         await executor.disconnect()
         shm.cleanup()
         logger.info("Engine stopped")
-
-
-if __name__ == "__main__":
-    uvloop.install()
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Stopped")
