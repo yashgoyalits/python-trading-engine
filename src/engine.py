@@ -1,5 +1,4 @@
 import asyncio
-import uvloop
 from src.core.shm_store import ShmStore
 from src.core.dtypes import TF_30S, TF_1M, TF_3M
 from src.infrastructure.shm_symbols import SymbolRegistry
@@ -75,9 +74,3 @@ async def main():
         logger.info("Engine stopped")
 
 
-if __name__ == "__main__":
-    uvloop.install()
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Stopped")

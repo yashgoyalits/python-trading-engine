@@ -1,6 +1,10 @@
-def main():
-    print("Hello from project!")
-
+import uvloop
+import asyncio
+from src.engine import main
 
 if __name__ == "__main__":
-    main()
+    uvloop.install()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Stopped")
