@@ -37,6 +37,10 @@ class StrategyHandler:
         self._logic    = StrategyLogicManager()
         self._csv      = TradeCSVLogger("trades.csv")
 
+        # ── Trailing: event se handoff control hoga ───────────
+        self._trailing_event = asyncio.Event()
+        self._trailing       = TrailingManager(trades, placement, logger)
+
         self._last_candle_seq = 0
         self._last_tick_seq   = 0
         self._last_order_seq  = 0
@@ -48,8 +52,11 @@ class StrategyHandler:
     async def run(self):
         self._tasks = [
             asyncio.create_task(self._candle_loop(), name="candle"),
-            asyncio.create_task(self._tick_loop(),   name="tick"),
             asyncio.create_task(self._order_loop(),  name="order"),
+            asyncio.create_task(
+                self._trailing.run(self._sym_idx, self._shm, self._trailing_event),
+                name=f"{self._sid}_trailing",
+            ),
         ]
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._log.info(f"[{self._sid}] All tasks done: {[t.get_name() for t in self._tasks]}")
@@ -99,27 +106,6 @@ class StrategyHandler:
 
         except asyncio.CancelledError:
             self._log.info(f"[{self._sid}] candle_loop cancelled.")
-
-    # ── tick loop ──────────────────────────────────────────────
-
-    async def _tick_loop(self):
-        tick_base = self._sym_idx * 200
-        try:
-            while True:
-                cur = int(self._shm.ctrl[self._sym_idx]['tick_seq'])
-                if cur != self._last_tick_seq:
-                    self._last_tick_seq = cur
-                    widx = int(self._shm.ctrl[self._sym_idx]['tick_widx'])
-                    tick = self._shm.ticks[tick_base + (widx - 1) % 200]
-
-                    trade = self._trades.get_active()
-                    if trade is not None:
-                        await self._trailing.check(tick, trade)
-
-                await asyncio.sleep(0)
-
-        except asyncio.CancelledError:
-            self._log.info(f"[{self._sid}] tick_loop cancelled.")
 
     # ── order loop ─────────────────────────────────────────────
 
@@ -171,12 +157,18 @@ class StrategyHandler:
         if oid == trade_id:
             if status == 2:
                 self._log.info(f"[{self._sid}] | Parent filled | Order ID: {oid}")
+
+                # basic trade info SHM mein likho
                 self._trades.update(
                     trade_id,
                     symbol=order['symbol'].decode().rstrip('\x00'),
                     qty=int(order['qty']),
                     entry_price=float(order['traded_price']),
                 )
+
+                # SHM ready hai — ab trailing task ko jagao
+                self._trailing_event.set()
+
             return  # ← parent handle ho gaya, child block skip karo
 
         # ── Child ──────────────────────────────────────────────────
