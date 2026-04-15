@@ -110,18 +110,15 @@ class StrategyHandler:
     # ── order loop ─────────────────────────────────────────────
 
     async def _order_loop(self):
-        last_processed_seq = 0
+        last_read_widx = 0
         try:
             while True:
                 ctrl_seq = int(self._shm.order_ctrl[0]['seq'])
                 if ctrl_seq != self._last_order_seq:
                     widx = int(self._shm.order_ctrl[0]['widx'])
-                    for i in range(MAX_ORDERS):
-                        slot = self._shm.orders[i]
-                        s    = int(slot['seq'])
-                        if s > last_processed_seq:
-                            await self._process_order(slot)
-                            last_processed_seq = max(last_processed_seq, s)
+                    while last_read_widx != widx:
+                        await self._process_order(self._shm.orders[last_read_widx])
+                        last_read_widx = (last_read_widx + 1) % MAX_ORDERS
                     self._last_order_seq = ctrl_seq
 
                 await asyncio.sleep(0)
