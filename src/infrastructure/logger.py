@@ -49,6 +49,8 @@ class ShmLogger:
         ctrl['widx']      = (widx + 1) % MAX_LOGS
         ctrl['seq']      += 1
 
+        print(f"[{'DEBUG' if level==10 else 'INFO' if level==20 else 'WARN' if level==30 else 'ERROR'}] {msg}")
+
         # File mein likho
         self._logger.log(level, msg)
 
