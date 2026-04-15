@@ -7,10 +7,11 @@ from src.core.dtypes import (
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
 from src.managers.active_trades import ActiveTradesManager
-from src.broker.fyers.order_placement import FyersOrderPlacement
+from src.executor.base_executor import BaseExecutor 
 from src.strategies.strategy_one.trailing import TrailingManager
 from src.strategies.strategy_one.logic import StrategyLogicManager
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
+
 
 
 class StrategyHandler:
@@ -19,7 +20,7 @@ class StrategyHandler:
         shm: ShmStore,
         symbols: SymbolRegistry,
         trades: ActiveTradesManager,
-        placement: FyersOrderPlacement,
+        executor: BaseExecutor,
         logger: ShmLogger,
         strategy_id: str,
         sym_name: str,
@@ -28,18 +29,17 @@ class StrategyHandler:
         self._shm      = shm
         self._sym_idx  = symbols.idx(sym_name)
         self._trades   = trades
-        self._place    = placement
+        self._executor = executor
         self._log      = logger
         self._sid      = strategy_id
         self._max      = max_trades
         self._done     = 0
-        self._trailing = TrailingManager(trades, placement, logger)
         self._logic    = StrategyLogicManager()
         self._csv      = TradeCSVLogger("trades.csv")
 
         # ── Trailing: event se handoff control hoga ───────────
         self._trailing_event = asyncio.Event()
-        self._trailing       = TrailingManager(trades, placement, logger)
+        self._trailing       = TrailingManager(trades, executor, logger)
 
         self._last_candle_seq = 0
         self._last_tick_seq   = 0
@@ -132,7 +132,7 @@ class StrategyHandler:
     # ── helpers ────────────────────────────────────────────────
 
     async def _enter(self):
-        res = await self._place.place_order(
+        res = await self._executor.place_order(
             symbol="NSE:IDEA-EQ", qty=1, order_type=2,
             side=1, stop_loss=0.5, take_profit=2.0,
         )

@@ -1,11 +1,12 @@
 import asyncio
+import uvloop
 from src.core.shm_store import ShmStore
 from src.core.dtypes import TF_30S, TF_1M, TF_3M
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
-from src.broker.fyers.order_placement import FyersOrderPlacement   # ← updated
+from src.executor.live_executor import LiveExecutor          # ← new
 from src.managers.candle_builder import CandleBuilder
 from src.managers.active_trades import ActiveTradesManager
 from src.strategies.strategy_one.handler import StrategyHandler
@@ -20,17 +21,21 @@ async def main():
 
     loop = asyncio.get_running_loop()
 
-    # ── 1. Init all three brokers ──────────────────────────────
-    data_broker     = FyersDataBroker(shm, syms, logger)
-    order_broker    = FyersOrderBroker(shm, logger)
-    order_placement = FyersOrderPlacement()
+    # ── 1. Brokers (transport layer) ──────────────────────────
+    data_broker  = FyersDataBroker(shm, syms, logger)
+    order_broker = FyersOrderBroker(shm, logger)
 
-    # ── 2. Connect all three together ─────────────────────────
+    # ── 2. Executor (strategy-facing layer) ───────────────────
+    # Kal broker badlna ho toh sirf yahan swap karo:
+    #   executor = ZerodhaExecutor()
+    executor = LiveExecutor()
+
+    # ── 3. Connect all ────────────────────────────────────────
     data_broker.connect(loop)
     order_broker.connect(loop)
-    await order_placement.connect()          # TCP pool + TLS warmup
+    await executor.connect()
 
-    # ── 3. Wait for WS connections ────────────────────────────
+    # ── 4. Wait for WS ────────────────────────────────────────
     while not data_broker.is_connected():
         await asyncio.sleep(0.1)
     logger.info("Data WS ready")
@@ -39,12 +44,12 @@ async def main():
         await asyncio.sleep(0.1)
     logger.info("Order WS ready")
 
-    logger.info(f"Order placement ready: {order_placement.is_connected()}")
+    logger.info(f"Executor ready: {executor.is_connected()}")
 
-    # ── 4. Subscribe ──────────────────────────────────────────
+    # ── 5. Subscribe ──────────────────────────────────────────
     data_broker.subscribe(["NSE:NIFTY50-INDEX"])
 
-    # ── 5. Build managers / strategy ──────────────────────────
+    # ── 6. Managers & strategy ────────────────────────────────
     candles = CandleBuilder(
         shm, syms,
         watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
@@ -53,7 +58,9 @@ async def main():
 
     trades   = ActiveTradesManager(shm, "STRATEGY_ONE")
     strategy = StrategyHandler(
-        shm, syms, trades, order_placement, logger,
+        shm, syms, trades,
+        executor=executor,              # ← BaseExecutor pass ho raha hai
+        logger=logger,
         strategy_id="STRATEGY_ONE",
         sym_name="NSE:NIFTY50-INDEX",
         max_trades=1,
@@ -69,8 +76,14 @@ async def main():
     finally:
         data_broker.disconnect()
         order_broker.disconnect()
-        await order_placement.disconnect()   # ← clean close
+        await executor.disconnect()
         shm.cleanup()
         logger.info("Engine stopped")
 
 
+if __name__ == "__main__":
+    uvloop.install()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Stopped")
