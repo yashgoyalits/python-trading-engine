@@ -51,6 +51,34 @@ class TrailingManager:
                 await asyncio.sleep(0)
 
 
-    async def _check_levels(self, tick, active_trade):
-
-        self._log.info(f"active_trade: {active_trade}")
+    async def _check_levels(self, tick, active_active_trade_view):
+        ltp   = float(tick['ltp'])
+        count = int(active_trade_view['trailing_count'])
+        if count == 0:
+            return
+ 
+        stop_oid = active_trade_view['stop_order_id'].tobytes().rstrip(b'\x00').decode()
+        qty      = int(active_trade_view['qty'])
+ 
+        for i in range(count):
+            lvl = active_trade_view['trailing'][i]
+            if bool(lvl['hit']):
+                continue
+ 
+            if ltp > float(lvl['threshold']):
+                self.log.infor("I want to place and modify order")
+                active_trade_view['trailing'][i]['hit'] = True
+                # res = await self._place.modify_order(
+                #     stop_oid,
+                #     order_type=4,
+                #     limit_price=float(lvl['new_stop']),
+                #     stop_price=float(lvl['new_stop']),
+                #     qty=qty,
+                # )
+                # if res.get('code') == 1102:
+                #     # Hit flag seedha SHM mein likho
+                #     active_trade_view['trailing'][i]['hit'] = True
+                #     self._log.info(f"TrailingManager: level {i} hit | LTP {ltp}")
+                # else:
+                #     self._log.error(f"TrailingManager: modify failed level {i} | {res}")
+ 
