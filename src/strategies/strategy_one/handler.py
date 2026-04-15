@@ -166,10 +166,15 @@ class StrategyHandler:
                     entry_price=float(order['traded_price']),
                 )
 
+                # trailing levels calculate karke SHM mein likho
+                levels = self._calc_trailing(order['traded_price'])
+                self._log.info(f"[{self._sid}] Trailing levels: {levels}")
+                self._trades.update(trade_id, trailing_levels=levels)
+
                 # SHM ready hai — ab trailing task ko jagao
                 self._trailing_event.set()
 
-            return  # ← parent handle ho gaya, child block skip karo
+            return  
 
         # ── Child ──────────────────────────────────────────────────
         if pid == trade_id:
@@ -197,3 +202,11 @@ class StrategyHandler:
                 self._log.info(
                     f"[{self._sid}] | Child cancelled | Order ID: {oid} | ParentID: {trade_id}"
                 )
+
+
+    def _calc_trailing(self, entry: float) -> list[dict]:
+        return [
+            {"threshold": entry + 1.0, "new_stop": entry + 0.5,  "hit": False},
+            {"threshold": entry + 2.0, "new_stop": entry + 1.0,  "hit": False},
+            {"threshold": entry + 3.0, "new_stop": entry + 2.0,  "hit": False},
+        ]

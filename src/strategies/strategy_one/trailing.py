@@ -53,4 +53,4 @@ class TrailingManager:
 
     async def _check_levels(self, tick, active_trade):
 
-        print(tick)
+        self._log.info(f"active_trade: {active_trade}")
