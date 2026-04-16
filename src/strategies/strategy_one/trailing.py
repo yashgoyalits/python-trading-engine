@@ -49,7 +49,7 @@ class TrailingManager:
                 await asyncio.sleep(0)
 
 
-    async def _check_levels(self, tick, active_active_trade_view):
+    async def _check_levels(self, tick, active_trade_view):
         ltp   = float(tick['ltp'])
         count = int(active_trade_view['trailing_count'])
         if count == 0:
@@ -64,7 +64,7 @@ class TrailingManager:
                 continue
  
             if ltp > float(lvl['threshold']):
-                self.log.info("I want to place and modify order")
+                self._log.info("I want to place and modify order")
                 active_trade_view['trailing'][i]['hit'] = True
                 # res = await self._place.modify_order(
                 #     stop_oid,
