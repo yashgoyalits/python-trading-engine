@@ -21,5 +21,8 @@ class SignalBus:
         self._subs[signal].append(cb)
 
     def fire(self, signal: Signal) -> None:
+        if asyncio.get_running_loop() is None:
+            raise RuntimeError("fire outside loop")
+
         for cb in self._subs[signal]:
             cb()
