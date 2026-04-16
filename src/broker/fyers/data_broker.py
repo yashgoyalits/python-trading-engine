@@ -74,6 +74,7 @@ class FyersDataBroker:
             reconnect=True,
             litemode=False,
             write_to_file=False,
+            log_path=None,
             on_connect=_on_open,
             on_message=_on_message,
             on_error=_on_error,

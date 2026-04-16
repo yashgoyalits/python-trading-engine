@@ -23,6 +23,7 @@ class FyersOrderBroker:
 
         self._fyers = order_ws.FyersOrderSocket(
             access_token=f"{client_id}:{token}",
+            reconnect=True,
             write_to_file=False,
             log_path=None,
             on_connect=self._on_open,
