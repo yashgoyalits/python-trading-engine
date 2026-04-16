@@ -10,6 +10,7 @@ from src.executor.live_executor import LiveExecutor          # ← new
 from src.managers.candle_builder import CandleBuilder
 from src.managers.active_trades import ActiveTradesManager
 from src.strategies.strategy_one.handler import StrategyHandler
+from src.core.signal_bus import SignalBus, Signal
 
 
 async def main():
@@ -47,11 +48,15 @@ async def main():
     # ── 5. Subscribe ──────────────────────────────────────────
     data_broker.subscribe(["NSE:NIFTY50-INDEX"])
 
+    # engine.py
+    bus = SignalBus()
+
     # ── 6. Managers & strategy ────────────────────────────────
     candles = CandleBuilder(
         shm, syms,
         watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
         logger=logger,
+        bus=bus,
     )
 
     trades   = ActiveTradesManager(shm, "STRATEGY_ONE")
@@ -63,6 +68,8 @@ async def main():
         sym_name="NSE:NIFTY50-INDEX",
         max_trades=1,
     )
+
+    bus.subscribe(Signal.CANDLE_30S_CLOSE, strategy._candle_event.set)
 
     logger.info("Engine started")
 

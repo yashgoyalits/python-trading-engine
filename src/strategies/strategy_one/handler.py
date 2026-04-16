@@ -13,7 +13,6 @@ from src.strategies.strategy_one.logic import StrategyLogicManager
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
 
-
 class StrategyHandler:
     def __init__(
         self,
@@ -36,6 +35,8 @@ class StrategyHandler:
         self._done     = 0
         self._logic    = StrategyLogicManager()
         self._csv      = TradeCSVLogger("trades.csv")
+
+        self._candle_event = asyncio.Event()
 
         # ── Trailing: event se handoff control hoga ───────────
         self._trailing_event = asyncio.Event()
@@ -73,36 +74,29 @@ class StrategyHandler:
         first = True
         try:
             while True:
-                cur = int(self._shm.ctrl[self._sym_idx]['c30s_seq'])
-                if cur != self._last_candle_seq:
-                    if first:
-                        first = False
-                        self._last_candle_seq = cur
-                        await asyncio.sleep(0)
-                        continue
+                await self._candle_event.wait()
+                self._candle_event.clear()
 
-                    self._last_candle_seq = cur
-                    widx   = int(self._shm.ctrl[self._sym_idx]['c30s_widx'])
-                    cidx   = (widx - 1) % MAX_CANDLE_HISTORY
-                    candle = self._shm.candles_30s[base + cidx]
+                if first:
+                    first = False
+                    continue
 
-                    trade = self._trades.get_active()
+                widx   = int(self._shm.ctrl[self._sym_idx]['c30s_widx'])
+                cidx   = (widx - 1) % MAX_CANDLE_HISTORY
+                candle = self._shm.candles_30s[base + cidx]
 
-                    # Active Trade Check
-                    if trade is None:
-                        # Max Trade Check
-                        if self._done >= self._max:
-                            self._log.info(
-                                f"[{self._sid}] Max trade limit reached: {self._done}. Stopping all loops."
-                            )
-                            self._stop_all()
-                            return
+                trade = self._trades.get_active()
 
-                        if self._logic.check_entry(candle):
-                            await self._enter()
-                    # else: trade chal rahi hai, candle loop kuch nahi karta — tick/order loop handle karenge
+                if trade is None:
+                    if self._done >= self._max:
+                        self._log.info(
+                            f"[{self._sid}] Max trade limit reached: {self._done}. Stopping all loops."
+                        )
+                        self._stop_all()
+                        return
 
-                await asyncio.sleep(0)
+                    if self._logic.check_entry(candle):
+                        await self._enter()
 
         except asyncio.CancelledError:
             self._log.info(f"[{self._sid}] candle_loop cancelled.")
