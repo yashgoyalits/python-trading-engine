@@ -64,7 +64,7 @@ class TrailingManager:
                 continue
  
             if ltp > float(lvl['threshold']):
-                self.log.infor("I want to place and modify order")
+                self.log.info("I want to place and modify order")
                 active_trade_view['trailing'][i]['hit'] = True
                 # res = await self._place.modify_order(
                 #     stop_oid,
