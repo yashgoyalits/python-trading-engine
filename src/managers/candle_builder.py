@@ -48,8 +48,6 @@ class CandleBuilder:
                 ctrl = self._shm.ctrl[sym_idx]
                 while True:
                     s1 = int(ctrl['tick_seq'])
-                    if s1 % 2 == 1:
-                        continue
                     widx   = int(ctrl['tick_widx'])
                     latest = (widx - 1) % MAX_TICKS_PER_SYMBOL
                     tick   = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + latest].copy()

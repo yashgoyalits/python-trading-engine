@@ -39,8 +39,6 @@ class TrailingManager:
                 # Seqlock
                 while True:
                     s1 = int(ctrl['tick_seq'])
-                    if s1 % 2 == 1:
-                        continue
                     widx = int(ctrl['tick_widx'])
                     tick = shm.ticks[tick_base + (widx - 1) % MAX_TICKS_PER_SYMBOL].copy()
                     s2   = int(ctrl['tick_seq'])
