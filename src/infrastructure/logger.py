@@ -27,8 +27,6 @@ def _setup_file_logger(log_path: str = "trading.log") -> logging.Logger:
 
 
 class ShmLogger:
-    """Write-anywhere (thread or async). Readers poll log_ctrl seq."""
-
     INFO    = 20
     WARNING = 30
     ERROR   = 40
@@ -40,18 +38,27 @@ class ShmLogger:
 
     def _write(self, level: int, msg: str):
         ctrl = self._shm.log_ctrl[0]
+
+        # relaxed index (may overwrite → acceptable for logs)
         widx = int(ctrl['widx'])
+        ctrl['widx'] = (widx + 1) % MAX_LOGS
+
         slot = self._shm.logs[widx]
-        slot['seq']       = int(ctrl['seq']) + 1
+
+        # ── SEQLOCK START ──
+        slot['seq'] += 1   # odd → writer active
+
         slot['timestamp'] = time.time()
         slot['level']     = level
         slot['message']   = msg.encode()[:255]
-        ctrl['widx']      = (widx + 1) % MAX_LOGS
-        ctrl['seq']      += 1
 
+        slot['seq'] += 1   # even → write complete
+        # ── SEQLOCK END ──
+
+        # Console (optional but slow)
         print(f"[{'DEBUG' if level==10 else 'INFO' if level==20 else 'WARN' if level==30 else 'ERROR'}] {msg}")
 
-        # File mein likho
+        # File logging (safe)
         self._logger.log(level, msg)
 
     def debug(self, msg: str):   self._write(self.DEBUG,   msg)
