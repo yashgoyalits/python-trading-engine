@@ -73,15 +73,26 @@ class ActiveTradesManager:
     # ── read ops ──────────────────────────────────────────────
 
     def get_active(self):
-        """O(1) — cached slot, no loop, no decode."""
         if self._active_slot is None:
             return None
-        row = self._buf[self._active_slot]
-        if row['active']:
-            return row
-        # stale cache (e.g. external close) — invalidate
-        self._active_slot = None
-        return None
+
+        slot = self._active_slot
+        row  = self._buf[slot]
+
+        # 1. active check
+        if not row['active']:
+            self._active_slot = None
+            return None
+
+        # 2. order_id consistency check (IMPORTANT)
+        oid = row['order_id'].tobytes().rstrip(b'\x00').decode()
+
+        if self._idx.get(oid) != slot:
+            # matlab slot reuse ho gaya ya external modify hua
+            self._active_slot = None
+            return None
+
+        return row
 
     # ── internal ──────────────────────────────────────────────
 
