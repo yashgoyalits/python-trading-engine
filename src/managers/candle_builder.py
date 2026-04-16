@@ -60,6 +60,8 @@ class CandleBuilder:
                     s2     = int(ctrl['tick_seq'])
                     if s1 == s2:
                         break
+                    
+                    await asyncio.sleep(0)  
 
                 ts  = float(tick['timestamp'])
                 ltp = float(tick['ltp'])
