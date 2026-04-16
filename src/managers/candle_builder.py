@@ -27,6 +27,12 @@ class CandleBuilder:
         self._log     = logger
         self._bus     = bus
 
+        self._TF_SIGNAL = {
+            TF_30S: Signal.CANDLE_30S_CLOSE,
+            TF_1M:  Signal.CANDLE_1M_CLOSE,
+            TF_3M:  Signal.CANDLE_3M_CLOSE,
+        }
+
         # Convert to idx-based
         self._watched: dict[int, list[int]] = {
             symbols.idx(sym): tfs for sym, tfs in watched.items()
@@ -87,7 +93,7 @@ class CandleBuilder:
             ctrl[bucket_f] = bucket
             ctrl[widx_f]   = new_widx
             ctrl[seq_f]   += 1     # signal to strategy that new candle closed
-            self._bus.fire(Signal.CANDLE_30S_CLOSE)
+            self._bus.fire(self._TF_SIGNAL[tf])
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
         else:
             # Update current candle in-place (zero copy)
