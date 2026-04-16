@@ -84,8 +84,8 @@ class CandleBuilder:
             candles[base + widx]['seq'] += 1
             # Open next slot
             new_widx = (widx + 1) % MAX_CANDLE_HISTORY
-            ctrl[widx_f]   = new_widx
             ctrl[bucket_f] = bucket
+            ctrl[widx_f]   = new_widx
             ctrl[seq_f]   += 1     # signal to strategy that new candle closed
             self._bus.fire(Signal.CANDLE_30S_CLOSE)
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
