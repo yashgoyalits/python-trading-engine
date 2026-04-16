@@ -36,8 +36,9 @@ class FyersOrderBroker:
         return self._connected
 
     def connect(self, loop: asyncio.AbstractEventLoop):
-        self._loop = loop
-        loop.run_in_executor(None, self._fyers.connect)
+        self._loop   = loop
+        self._thread = threading.Thread(target=self._fyers.connect, daemon=True)
+        self._thread.start()
 
     def disconnect(self):
         self._connected = False
