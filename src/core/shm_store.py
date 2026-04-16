@@ -22,8 +22,7 @@ class ShmStore:
         self.orders      = self._alloc("orders",       MAX_ORDERS,                         ORDER_DTYPE)
         self.order_ctrl  = self._alloc("order_ctrl",   1,                                  ORDER_CTRL_DTYPE)
         self.trades      = self._alloc("trades",       MAX_ACTIVE_TRADES,                  TRADE_DTYPE)
-        self.logs        = self._alloc("logs",         MAX_LOGS,                           LOG_DTYPE)
-        self.log_ctrl    = self._alloc("log_ctrl",     1,                                  LOG_CTRL_DTYPE)
+        
 
     def _alloc(self, name: str, count: int, dtype: np.dtype) -> np.ndarray:
         size = count * dtype.itemsize

@@ -5,7 +5,6 @@ MAX_TICKS_PER_SYMBOL = 200
 MAX_CANDLE_HISTORY   = 20
 MAX_ACTIVE_TRADES    = 5
 MAX_TRAILING         = 5
-MAX_LOGS             = 20
 MAX_ORDERS           = 32   # ring buffer
 
 TF_30S = 30
@@ -95,21 +94,8 @@ TRADE_DTYPE = np.dtype([
     ('trailing',        TRAILING_DTYPE, (MAX_TRAILING,)),
 ])
 
-LOG_DTYPE = np.dtype([
-    ('seq',       np.uint64),
-    ('timestamp', np.float64),
-    ('level',     np.uint8),    # 10=DEBUG 20=INFO 30=WARN 40=ERROR
-    ('_pad',      np.uint8, (7,)),
-    ('message',   'S256'),
-])
-
 # Global order ring buffer control
 ORDER_CTRL_DTYPE = np.dtype([
-    ('widx', np.uint32),
-    ('seq',  np.uint64),
-])
-
-LOG_CTRL_DTYPE = np.dtype([
     ('widx', np.uint32),
     ('seq',  np.uint64),
 ])

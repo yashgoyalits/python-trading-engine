@@ -16,7 +16,7 @@ from src.core.signal_bus import SignalBus, Signal
 async def main():
     shm    = ShmStore(create=True)
     syms   = SymbolRegistry()
-    logger = ShmLogger(shm)
+    logger = ShmLogger()
 
     syms.register("NSE:NIFTY50-INDEX")
 
