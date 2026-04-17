@@ -54,22 +54,24 @@ class CandleBuilder:
                 read_idx = last_widx[sym_idx]
 
                 while read_idx != cur_widx:
+                    slot = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + read_idx]
                     # ── SEQLOCK ───────────────────────────
                     while True:
                         s1 = int(ctrl['tick_seq'])
                         if s1 & 1:
                             await asyncio.sleep(0)
                             continue
-                        tick = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + read_idx].copy()
-                        s2   = int(ctrl['tick_seq'])
+                        # ── DIRECT FIELD READ ──
+                        ts  = float(slot['timestamp'])
+                        ltp = float(slot['ltp'])
+                        vol = int(slot['volume'])
+
+                        s2 = int(ctrl['tick_seq'])
                         if s1 == s2:
                             break
+
                         await asyncio.sleep(0)
                     # ─────────────────────────────────────────────
-                    ts  = float(tick['timestamp'])
-                    ltp = float(tick['ltp'])
-                    vol = int(tick['volume'])
-
                     for tf in timeframes:
                         self._process(sym_idx, tf, ts, ltp, vol)
 
