@@ -7,6 +7,7 @@ from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
+from src.core.dtypes import *
 
 load_dotenv()
 
@@ -86,7 +87,7 @@ class FyersDataBroker:
     def _write_tick(self, sym_idx: int, msg: dict):
         ctrl = self._shm.ctrl[sym_idx]
         widx = int(ctrl['tick_widx'])
-        slot = self._shm.ticks[sym_idx * 200 + widx]
+        slot = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + widx]
 
         # ── SEQLOCK WRITER START ──────────────────────────────
         ctrl['tick_seq'] += 1          # odd → "busy"
@@ -99,4 +100,4 @@ class FyersDataBroker:
         slot['prev_close'] = msg.get("prev_close_price", 0.0)
         # ── SEQLOCK WRITER END ───────────────────────────────
         ctrl['tick_seq'] += 1          # even → "ready"
-        ctrl['tick_widx'] = (widx + 1) % 200
+        ctrl['tick_widx'] = (widx + 1) % MAX_TICKS_PER_SYMBOL
