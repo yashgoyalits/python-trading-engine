@@ -158,7 +158,7 @@ class StrategyHandler:
                 )
 
                 # trailing levels calculate karke SHM mein likho
-                levels = self._calc_trailing(order['traded_price'])
+                levels = self._calc_trailing(float(order['traded_price']))
                 self._log.info(f"[{self._sid}] Trailing levels: {levels}")
                 self._trades.update(trade_id, trailing_levels=levels)
 
