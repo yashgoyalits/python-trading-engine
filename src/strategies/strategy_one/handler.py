@@ -111,7 +111,8 @@ class StrategyHandler:
                 if ctrl_seq != self._last_order_seq:
                     widx = int(self._shm.order_ctrl[0]['widx'])
                     while last_read_widx != widx:
-                        await self._process_order(self._shm.orders[last_read_widx])
+                        order = self._shm.orders[last_read_widx].copy()
+                        await self._process_order(order)
                         last_read_widx = (last_read_widx + 1) % MAX_ORDERS
                     self._last_order_seq = ctrl_seq
 
