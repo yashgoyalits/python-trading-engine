@@ -15,24 +15,13 @@ class FyersOrderBroker:
     def __init__(self, shm: ShmStore, logger: ShmLogger):
         self._shm   = shm
         self._log   = logger
-        self._loop  = None
+        self._client_id = os.getenv("CLIENT_ID")
+        self._token     = os.getenv("FYERS_ACCESS_TOKEN")
+        self._socket  = None
+        self._thread  = None
+        self._loop    = None
+        self._running = False
         self._connected = False
-
-        client_id = os.getenv("CLIENT_ID")
-        token     = os.getenv("FYERS_ACCESS_TOKEN")
-
-        self._fyers = order_ws.FyersOrderSocket(
-            access_token=f"{client_id}:{token}",
-            reconnect=True,
-            write_to_file=False,
-            log_path=None,
-            on_connect=self._on_open,
-            on_close=self._on_close,
-            on_error=self._on_error,
-            on_orders=self._on_order,
-            on_positions=self._on_position,
-            on_trades=lambda _: None,
-        )
 
     def is_connected(self) -> bool:
         return self._connected
@@ -40,7 +29,7 @@ class FyersOrderBroker:
     def connect(self, loop: asyncio.AbstractEventLoop):
         self._loop   = loop
         self._running = True
-        self._thread = threading.Thread(target=self._fyers.connect, daemon=True)
+        self._thread = threading.Thread(target=self._run_ws, daemon=True)
         self._thread.start()
 
     def disconnect(self):
@@ -50,28 +39,44 @@ class FyersOrderBroker:
 
     # ── callbacks (run in WS thread) ───────────────────────────
 
-    def _on_open(self):
-        self._connected = True
-        self._fyers.subscribe(data_type="OnOrders")
-        self._fyers.subscribe(data_type="OnPositions")
-        self._log.info("Fyers order WS connected")
+    def _run_ws(self):
+        def _on_open():
+            self._connected = True
+            self._fyers.subscribe(data_type="OnOrders")
+            self._fyers.subscribe(data_type="OnPositions")
+            self._log.info("Fyers order WS connected")
 
-    def _on_close(self, msg):
-        self._connected = False
+        def _on_close(msg):
+            self._connected = False
 
-    def _on_error(self, msg):
-        self._log.error(f"Fyers order WS error: {msg}")
+        def _on_error(msg):
+            self._log.error(f"Fyers order WS error: {msg}")
 
-    def _on_order(self, msg):
-        orders = msg.get("orders") or []
-        if not isinstance(orders, list):
-            orders = [orders]
-        for o in orders:
-            self._write_order(o)
+        def _on_order(msg):
+            orders = msg.get("orders") or []
+            if not isinstance(orders, list):
+                orders = [orders]
+            for o in orders:
+                self._write_order(o)
 
-    def _on_position(self, msg):
-        # positions handled separately if needed
-        pass
+        def _on_position(msg):
+            pass
+
+        self._fyers = order_ws.FyersOrderSocket(
+            access_token=f"{self._client_id}:{self._token}",
+            reconnect=True,
+            write_to_file=False,
+            log_path=None,
+            on_connect=_on_open,
+            on_orders=_on_order,
+            on_positions=_on_position,
+            on_trades=lambda _: None,
+            on_close=_on_close,
+            on_error=_on_error,
+        )
+        self._fyers.connect()
+        self._fyers.keep_running()
+    
 
     def _write_order(self, o: dict):
         ctrl = self._shm.order_ctrl[0]
