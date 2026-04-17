@@ -37,43 +37,48 @@ class CandleBuilder:
         self._watched: dict[int, list[int]] = {
             symbols.idx(sym): tfs for sym, tfs in watched.items()
         }
-        # Track last seen tick_seq per symbol
-        self._last_tick_seq = [0] * MAX_SYMBOLS
 
+    
     async def run(self):
+        last_widx: dict[int, int | None] = {sym_idx: None for sym_idx in self._watched}
+
         while True:
             for sym_idx, timeframes in self._watched.items():
-                cur_seq = int(self._shm.ctrl[sym_idx]['tick_seq'])
-                if cur_seq == self._last_tick_seq[sym_idx]:
+                ctrl     = self._shm.ctrl[sym_idx]
+                cur_widx = int(ctrl['tick_widx'])
+
+                if last_widx[sym_idx] is None:
+                    last_widx[sym_idx] = cur_widx
                     continue
 
-                self._last_tick_seq[sym_idx] = cur_seq
+                read_idx = last_widx[sym_idx]
 
-                # Read latest tick (widx points to NEXT write slot, so -1 is latest)
-                # Reader seqlock
-                ctrl = self._shm.ctrl[sym_idx]
-                while True:
-                    s1 = int(ctrl['tick_seq'])
-                    if s1 & 1:          
+                while read_idx != cur_widx:
+                    # ── SEQLOCK ───────────────────────────
+                    while True:
+                        s1 = int(ctrl['tick_seq'])
+                        if s1 & 1:
+                            await asyncio.sleep(0)
+                            continue
+                        tick = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + read_idx].copy()
+                        s2   = int(ctrl['tick_seq'])
+                        if s1 == s2:
+                            break
                         await asyncio.sleep(0)
-                        continue
-                    widx   = int(ctrl['tick_widx'])
-                    latest = (widx - 1) % MAX_TICKS_PER_SYMBOL
-                    tick   = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + latest].copy()
-                    s2     = int(ctrl['tick_seq'])
-                    if s1 == s2:
-                        break
-                    
-                    await asyncio.sleep(0)  
+                    # ─────────────────────────────────────────────
+                    ts  = float(tick['timestamp'])
+                    ltp = float(tick['ltp'])
+                    vol = int(tick['volume'])
 
-                ts  = float(tick['timestamp'])
-                ltp = float(tick['ltp'])
-                vol = int(tick['volume'])
+                    for tf in timeframes:
+                        self._process(sym_idx, tf, ts, ltp, vol)
 
-                for tf in timeframes:
-                    self._process(sym_idx, tf, ts, ltp, vol)
+                    read_idx = (read_idx + 1) % MAX_TICKS_PER_SYMBOL
 
-            await asyncio.sleep(0)  # yield — no blocking, no queue
+                last_widx[sym_idx] = cur_widx
+
+            await asyncio.sleep(0.005)
+
 
     def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
         seq_f, widx_f, bucket_f, arr_attr = _TF_META[tf]
