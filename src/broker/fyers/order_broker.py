@@ -80,8 +80,6 @@ class FyersOrderBroker:
 
         # ── SEQLOCK WRITER START ──────────────────────────────
         ctrl['seq'] += 1              # odd → "busy"
-        # ─────────────────────────────────────────────────────
-
         slot['status']         = o.get("status", 0)
         slot['order_type']     = o.get("type", 0)
         slot['side']           = o.get("side", 0)
@@ -93,8 +91,6 @@ class FyersOrderBroker:
         slot['parent_id']      = (o.get("parentId", "") or "").encode()[:64]
         slot['symbol']         = (o.get("symbol", "") or "").encode()[:32]
         slot['order_datetime'] = o.get("orderDateTime", "").encode()[:32]
-        slot['seq']            = int(ctrl['seq'])
-
         # ── SEQLOCK WRITER END ───────────────────────────────
         ctrl['seq'] += 1              # even → "ready"
         ctrl['widx'] = (widx + 1) % MAX_ORDERS

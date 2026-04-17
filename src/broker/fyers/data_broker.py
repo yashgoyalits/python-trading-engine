@@ -90,9 +90,6 @@ class FyersDataBroker:
 
         # ── SEQLOCK WRITER START ──────────────────────────────
         ctrl['tick_seq'] += 1          # odd → "busy"
-        # numpy memory barrier ke liye: simple assignment kafi hai Python mein
-        # ─────────────────────────────────────────────────────
-
         slot['timestamp']  = msg.get("exch_feed_time", 0)
         slot['ltp']        = msg.get("ltp", 0.0)
         slot['volume']     = msg.get("volume", 0)
@@ -100,8 +97,6 @@ class FyersDataBroker:
         slot['high_price'] = msg.get("high_price", 0.0)
         slot['low_price']  = msg.get("low_price", 0.0)
         slot['prev_close'] = msg.get("prev_close_price", 0.0)
-        slot['seq']        = int(ctrl['tick_seq'])  # ← yeh bhi data hai
-
         # ── SEQLOCK WRITER END ───────────────────────────────
         ctrl['tick_seq'] += 1          # even → "ready"
         ctrl['tick_widx'] = (widx + 1) % 200
