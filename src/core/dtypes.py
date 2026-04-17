@@ -1,11 +1,11 @@
 import numpy as np
 
 MAX_SYMBOLS          = 25
-MAX_TICKS_PER_SYMBOL = 5000
+MAX_TICKS_PER_SYMBOL = 256
 MAX_CANDLE_HISTORY   = 500
 MAX_ACTIVE_TRADES    = 10
 MAX_TRAILING         = 5
-MAX_ORDERS           = 500
+MAX_ORDERS           = 200
 
 TF_30S = 30
 TF_1M  = 60
