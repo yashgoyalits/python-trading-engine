@@ -117,7 +117,20 @@ class StrategyHandler:
                     widx = int(ctrl['widx'])
 
                     while last_read_widx != widx:
-                        order = self._shm.orders[last_read_widx].copy()
+                        while True:
+                            slot = self._shm.orders[last_read_widx]
+
+                            s1 = int(slot['seq'])
+                            if s1 & 1:
+                                await asyncio.sleep(0)
+                                continue
+
+                            order = slot.copy()
+
+                            s2 = int(slot['seq'])
+                            if s1 == s2:
+                                break
+                        
                         await self._process_order(order)
 
                         last_read_widx = (last_read_widx + 1) % MAX_ORDERS
