@@ -105,20 +105,20 @@ class StrategyHandler:
 
     async def _order_loop(self):
         ctrl = self._shm.order_ctrl[0]
-        last_read_widx = int(ctrl['widx'])         
+        last_read_widx = int(ctrl['widx'])
 
         try:
             while True:
                 await asyncio.sleep(0.001)
 
-                while last_read_widx != int(ctrl['widx']):   
+                while last_read_widx != int(ctrl['widx']):
                     slot = self._shm.orders[last_read_widx]
                     while True:
-                        s1 = int(slot['seq'])
+                        s1 = int(ctrl['seq'])
                         if s1 & 1:
                             await asyncio.sleep(0)
                             continue
-                        s2 = int(slot['seq'])
+                        s2 = int(ctrl['seq'])
                         if s1 == s2:
                             break
                     await self._process_order(slot)
