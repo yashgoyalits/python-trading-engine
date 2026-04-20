@@ -138,7 +138,7 @@ class StrategyHandler:
             self._done += 1
             self._trades.add_trade(self._done, res.get("id", ""))
             self._log.info(f"[{self._sid}] Order placed {res.get('id')}")
-        else 
+        else: 
             self._log.error(f"[{self._sid}] Order placement failed: {res}")
 
     
