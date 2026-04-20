@@ -62,7 +62,7 @@ class CandleBuilder:
                         if s1 == s2:
                             break
 
-                        await asyncio.sleep(0)
+                        await asyncio.sleep(0.001)
                     # ─────────────────────────────────────────────
                     for tf in timeframes:
                         self._process(sym_idx, tf, ts, ltp, vol)
@@ -71,7 +71,7 @@ class CandleBuilder:
 
                 last_widx[sym_idx] = cur_widx
 
-            await asyncio.sleep(0.005)
+            await asyncio.sleep(0.001)
 
 
     def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):

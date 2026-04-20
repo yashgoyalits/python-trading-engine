@@ -11,16 +11,16 @@ class TrailingManager:
         self._executor = executor
         self._log      = logger
 
+    
     async def run(self, sym_idx: int, shm: ShmStore, event: asyncio.Event):
+        ctrl      = shm.ctrl[sym_idx]
+        tick_base = sym_idx * MAX_TICKS_PER_SYMBOL
 
         while True:
             await event.wait()
 
-            last_seq = 0
+            last_seq = int(ctrl['tick_seq'])
             self._log.info("TrailingManager: active, ticks watch kar raha hai")
-
-            ctrl      = shm.ctrl[sym_idx]          
-            tick_base = sym_idx * MAX_TICKS_PER_SYMBOL  
 
             while True:
                 trade = self._trades.get_active()
@@ -29,27 +29,26 @@ class TrailingManager:
                     self._log.info("TrailingManager: trade closed, so raha hai")
                     break
 
-                cur_seq = int(ctrl['tick_seq'])     
+                await asyncio.sleep(0.001)
+
+                cur_seq = int(ctrl['tick_seq'])
                 if cur_seq == last_seq:
-                    await asyncio.sleep(0)
                     continue
 
                 last_seq = cur_seq
 
-                # Seqlock
                 while True:
                     s1 = int(ctrl['tick_seq'])
-                    if s1 & 1:          
+                    if s1 & 1:
                         await asyncio.sleep(0)
                         continue
                     widx = int(ctrl['tick_widx'])
-                    tick = shm.ticks[tick_base + (widx - 1) % MAX_TICKS_PER_SYMBOL].copy()
                     s2   = int(ctrl['tick_seq'])
                     if s1 == s2:
                         break
 
-                await self._check_levels(tick, trade)
-                await asyncio.sleep(0)
+                slot = shm.ticks[tick_base + (widx - 1) % MAX_TICKS_PER_SYMBOL]
+                await self._check_levels(slot, trade)
 
 
     async def _check_levels(self, tick, active_trade_view):
