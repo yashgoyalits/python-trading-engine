@@ -6,7 +6,6 @@ from src.core.dtypes import (
 )
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
-from src.core.signal_bus import SignalBus, Signal
 
 # Maps timeframe → ctrl field names + candle array
 _TF_META = {
@@ -18,20 +17,13 @@ _TF_META = {
 
 class CandleBuilder:
     def __init__(self, shm: ShmStore, symbols: SymbolRegistry,
-                 watched: dict[str, list[int]], logger: ShmLogger, bus: SignalBus):
+                 watched: dict[str, list[int]], logger: ShmLogger):
         """
         watched: { "NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M], ... }
         """
         self._shm     = shm
         self._symbols = symbols
         self._log     = logger
-        self._bus     = bus
-
-        self._TF_SIGNAL = {
-            TF_30S: Signal.CANDLE_30S_CLOSE,
-            TF_1M:  Signal.CANDLE_1M_CLOSE,
-            TF_3M:  Signal.CANDLE_3M_CLOSE,
-        }
 
         # Convert to idx-based
         self._watched: dict[int, list[int]] = {
@@ -105,7 +97,6 @@ class CandleBuilder:
             ctrl[bucket_f] = bucket
             ctrl[widx_f]   = new_widx
             ctrl[seq_f]   += 1     # signal to strategy that new candle closed
-            self._bus.fire(self._TF_SIGNAL[tf])
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
         else:
             # Update current candle in-place (zero copy)

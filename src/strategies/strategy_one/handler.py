@@ -36,8 +36,6 @@ class StrategyHandler:
         self._logic    = StrategyLogicManager()
         self._csv      = TradeCSVLogger("trades.csv")
 
-        self._candle_event = asyncio.Event()
-
         # ── Trailing: event se handoff control hoga ───────────
         self._trailing_event = asyncio.Event()
         self._trailing       = TrailingManager(trades, executor, logger)
@@ -70,18 +68,21 @@ class StrategyHandler:
     # ── candle loop ────────────────────────────────────────────
 
     async def _candle_loop(self):
-        base  = self._sym_idx * MAX_CANDLE_HISTORY
-        first = True
+        base     = self._sym_idx * MAX_CANDLE_HISTORY
+        ctrl     = self._shm.ctrl[self._sym_idx]
+        last_seq = int(ctrl['c30s_seq'])          # pehla seq capture — skip initial fire
+
         try:
             while True:
-                await self._candle_event.wait()
-                self._candle_event.clear()
+                await asyncio.sleep(0.001)
 
-                if first:
-                    first = False
+                cur_seq = int(ctrl['c30s_seq'])
+                if cur_seq == last_seq:
                     continue
 
-                widx   = int(self._shm.ctrl[self._sym_idx]['c30s_widx'])
+                last_seq = cur_seq
+
+                widx   = int(ctrl['c30s_widx'])
                 cidx   = (widx - 1) % MAX_CANDLE_HISTORY
                 candle = self._shm.candles_30s[base + cidx]
 
