@@ -42,7 +42,6 @@ class StrategyHandler:
 
         self._last_candle_seq = 0
         self._last_tick_seq   = 0
-        self._last_order_seq  = 0
 
         self._tasks: list[asyncio.Task] = []
 
@@ -106,20 +105,13 @@ class StrategyHandler:
 
     async def _order_loop(self):
         ctrl = self._shm.order_ctrl[0]
-        last_read_widx       = int(ctrl['widx'])
-        self._last_order_seq = int(ctrl['seq'])
+        last_read_widx = int(ctrl['widx'])         
 
         try:
             while True:
                 await asyncio.sleep(0.001)
 
-                cur_seq = int(ctrl['seq'])
-                if cur_seq == self._last_order_seq:
-                    continue
-
-                widx = int(ctrl['widx'])
-
-                while last_read_widx != widx:
+                while last_read_widx != int(ctrl['widx']):   
                     slot = self._shm.orders[last_read_widx]
                     while True:
                         s1 = int(slot['seq'])
@@ -131,8 +123,6 @@ class StrategyHandler:
                             break
                     await self._process_order(slot)
                     last_read_widx = (last_read_widx + 1) % MAX_ORDERS
-
-                self._last_order_seq = cur_seq
 
         except asyncio.CancelledError:
             self._log.info(f"[{self._sid}] order_loop cancelled.")
@@ -148,6 +138,8 @@ class StrategyHandler:
             self._done += 1
             self._trades.add_trade(self._done, res.get("id", ""))
             self._log.info(f"[{self._sid}] Order placed {res.get('id')}")
+        else 
+            self._log.error(f"[{self._sid}] Order placement failed: {res}")
 
     
     async def _process_order(self, order):
