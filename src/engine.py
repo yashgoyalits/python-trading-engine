@@ -95,4 +95,5 @@ async def main():
         order_broker.disconnect()
         await executor.disconnect()
         shm.cleanup()
+        stop_log_listener()
         logger.info("Engine stopped")
