@@ -33,17 +33,23 @@ class TrailingManager:
 
                 cur_widx = int(ctrl['tick_widx'])
 
-                while last_read_widx != cur_widx:       # ← drain loop, har tick process hoga
-                    slot = shm.ticks[tick_base + last_read_widx]
-
-                    while True:                         # ← seqlock (same as CandleBuilder)
+                while last_read_widx != cur_widx:       
+                    # ── SEQLOCK — slot read lock ke ANDAR ────────────
+                    while True:
                         s1 = int(ctrl['tick_seq'])
                         if s1 & 1:
                             await asyncio.sleep(0)
                             continue
+
+                        # data read between s1 and s2
+                        slot = shm.ticks[tick_base + last_read_widx]
+                        ltp  = float(slot['ltp'])
+                        ts   = float(slot['timestamp'])
+
                         s2 = int(ctrl['tick_seq'])
                         if s1 == s2:
                             break
+                    # ─────────────────────────────────────────────────
 
                     await self._check_levels(slot, trade)
                     last_read_widx = (last_read_widx + 1) % MAX_TICKS_PER_SYMBOL
