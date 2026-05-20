@@ -65,17 +65,16 @@ async def main():
 
     order_feed = OrderFeedManager(
         shm=shm,
-        trades=active_trade_manager,
+        registry=registry,
         logger=logger,
         trailing_event=trailing_event,
         csv_logger=csv_logger,
-        strategy_id="STRATEGY_ONE",
     )
 
     strategy = StrategyHandler(
         shm=shm,
         symbols=syms,
-        trades=trades,
+        trades=active_trade_manager,
         executor=executor,
         logger=logger,
         strategy_id="STRATEGY_ONE",

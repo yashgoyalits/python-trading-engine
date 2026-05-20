@@ -21,5 +21,8 @@ class TradeRegistry:
         self._stores[strategy_id] = store
         return store
 
+    def all(self) -> list[ITradeStore]:
+        return list(self._stores.values())
+
     def release(self, strategy_id: str) -> None:
         self._stores.pop(strategy_id, None)

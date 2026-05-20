@@ -2,6 +2,7 @@ import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
 from src.trade_store import ITradeStore
+from src.trade_store.registry import TradeRegistry
 from src.infrastructure.logger import ShmLogger
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
@@ -10,18 +11,16 @@ class OrderFeedManager:
     def __init__(
         self,
         shm: ShmStore,
-        trades: ITradeStore,
+        registry: TradeRegistry,
         logger: ShmLogger,
         trailing_event: asyncio.Event,
         csv_logger: TradeCSVLogger,
-        strategy_id: str,
     ):
         self._shm            = shm
-        self._trades         = trades
+        self._registry       = registry
         self._log            = logger
         self._trailing_event = trailing_event
         self._csv            = csv_logger
-        self._sid            = strategy_id
 
     
     async def run(self):
@@ -76,39 +75,56 @@ class OrderFeedManager:
         stop_price: float, limit_price: float, traded_price: float,
         order_id: str, parent_id: str, symbol: str,
     ):
-        trade = self._trades.get_active()
-        if trade is None:
-            return
+        for store in self._registry.all():               # ← sab strategies loop
+            trade = store.get_active()
+            if trade is None:
+                continue
 
-        trade_id = trade['order_id'].tobytes().rstrip(b'\x00').decode()
+            trade_id = trade['order_id'].tobytes().rstrip(b'\x00').decode()
 
+            if order_id == trade_id or parent_id == trade_id:
+                await self._handle(store, trade, trade_id,
+                                   status, order_type, qty,
+                                   stop_price, limit_price, traded_price,
+                                   order_id, parent_id, symbol)
+                return                                   # match mila — stop
+
+    async def _handle(
+        self,
+        store: ITradeStore,
+        trade,
+        trade_id: str,
+        status: int, order_type: int, qty: int,
+        stop_price: float, limit_price: float, traded_price: float,
+        order_id: str, parent_id: str, symbol: str,
+    ):
         if order_id == trade_id:
             if status == 2:
-                self._log.info(f"[{self._sid}] | Parent filled | Order ID: {order_id}")
-                self._trades.update(trade_id, symbol=symbol, qty=qty, entry_price=traded_price)
+                self._log.info(f"Parent filled | Order ID: {order_id}")
+                store.update(trade_id, symbol=symbol, qty=qty, entry_price=traded_price)
                 levels = self._calc_trailing(traded_price)
-                self._trades.update(trade_id, trailing_levels=levels)
+                store.update(trade_id, trailing_levels=levels)
                 self._trailing_event.set()
             return
 
         if parent_id == trade_id:
             if status == 6 and order_type == 4:
                 if order_id != trade['stop_order_id'].tobytes().rstrip(b'\x00').decode():
-                    self._log.info(f"[{self._sid}] | Child stop loss update")
-                    self._trades.update(trade_id, stop_order_id=order_id, stop_price=stop_price)
+                    self._log.info(f"Child stop loss update")
+                    store.update(trade_id, stop_order_id=order_id, stop_price=stop_price)
 
             if status == 6 and order_type == 1:
                 if order_id != trade['target_order_id'].tobytes().rstrip(b'\x00').decode():
-                    self._log.info(f"[{self._sid}] | Child take profit update")
-                    self._trades.update(trade_id, target_order_id=order_id, target_price=limit_price)
+                    self._log.info(f"Child take profit update")
+                    store.update(trade_id, target_order_id=order_id, target_price=limit_price)
 
             if status == 2:
-                self._log.info(f"[{self._sid}] | Child filled | Order ID: {order_id} | ParentID: {trade_id}")
+                self._log.info(f"Child filled | Order ID: {order_id}")
                 self._csv.log_close(trade)
-                self._trades.close_trade(trade_id)
+                store.close_trade(trade_id)
 
             if status == 1:
-                self._log.info(f"[{self._sid}] | Child cancelled | Order ID: {order_id} | ParentID: {trade_id}")
+                self._log.info(f"Child cancelled | Order ID: {order_id}")
     
 
     def _calc_trailing(self, entry: float) -> list[dict]:
