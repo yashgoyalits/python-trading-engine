@@ -1,6 +1,6 @@
-# main.py
 import uvloop
 import asyncio
+import os
 from src.engine import Engine
 
 if __name__ == "__main__":
@@ -9,3 +9,5 @@ if __name__ == "__main__":
         asyncio.run(Engine().run())
     except KeyboardInterrupt:
         print("Stopped")
+    finally:
+        os._exit(0)
