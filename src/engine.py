@@ -51,7 +51,7 @@ async def main():
 
     # ── 6. Shared objects ─────────────────────────────────────
     registry = TradeRegistry(shm)
-    trades   = registry.register("STRATEGY_ONE", slot_count=1)
+    trades   = registry.register("STRATEGY_ONE")
     # ──  ─────────────────────────────────────
     trailing_event = asyncio.Event()
     csv_logger     = TradeCSVLogger("trades.csv")

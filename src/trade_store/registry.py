@@ -11,7 +11,8 @@ class TradeRegistry:
         self._next_slot  = 0
         self._stores: dict[str, ITradeStore] = {}
 
-    def register(self, strategy_id: str, slot_count: int = 1) -> ITradeStore:
+    def register(self, strategy_id: str) -> ITradeStore:
+        slot_count = 1
         assert strategy_id not in self._stores, \
             f"{strategy_id} already registered"
         assert self._next_slot + slot_count <= self._total, \
