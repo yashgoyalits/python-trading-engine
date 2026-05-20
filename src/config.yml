@@ -9,7 +9,6 @@ symbols:
 
 strategies:
   - id: STRATEGY_ONE
-    symbol: NSE:NIFTY50-INDEX
     trade_symbol: NSE:IDEA-EQ
     max_trades: 1
     timeframes: [30, 60, 180]
