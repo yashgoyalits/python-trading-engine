@@ -1,0 +1,31 @@
+# config.yml
+
+engine:
+  log_file: trading.log
+  trade_csv: trades.csv
+
+symbols:
+  - NSE:NIFTY50-INDEX
+
+strategies:
+  - id: STRATEGY_ONE
+    symbol: NSE:NIFTY50-INDEX
+    trade_symbol: NSE:IDEA-EQ
+    max_trades: 1
+    timeframes: [30, 60, 180]
+    entry_tf: 30
+
+    order:
+      qty: 1
+      order_type: 2
+      side: 1
+      stop_loss: 0.5
+      take_profit: 2.0
+
+    trailing:
+      - threshold_offset: 1.0
+        new_stop_offset: 0.5
+      - threshold_offset: 2.0
+        new_stop_offset: 1.0
+      - threshold_offset: 3.0
+        new_stop_offset: 2.0
