@@ -51,7 +51,7 @@ async def main():
 
     # ── 6. Shared objects ─────────────────────────────────────
     registry = TradeRegistry(shm)
-    trades   = registry.register("STRATEGY_ONE")
+    active_trade_manager   = registry.register("STRATEGY_ONE")
     # ──  ─────────────────────────────────────
     trailing_event = asyncio.Event()
     csv_logger     = TradeCSVLogger("trades.csv")
@@ -65,7 +65,7 @@ async def main():
 
     order_feed = OrderFeedManager(
         shm=shm,
-        trades=trades,
+        trades=active_trade_manager,
         logger=logger,
         trailing_event=trailing_event,
         csv_logger=csv_logger,

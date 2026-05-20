@@ -12,19 +12,12 @@ class TradeRegistry:
         self._stores: dict[str, ITradeStore] = {}
 
     def register(self, strategy_id: str) -> ITradeStore:
-        slot_count = 1
-        assert strategy_id not in self._stores, \
-            f"{strategy_id} already registered"
-        assert self._next_slot + slot_count <= self._total, \
-            f"Slots exhausted: need {slot_count}, left {self._total - self._next_slot}"
-
         store = ActiveTradesManager(
             shm=self._shm,
             strategy_id=strategy_id,
             slot_start=self._next_slot,
-            slot_count=slot_count,
         )
-        self._next_slot += slot_count
+        self._next_slot += 1
         self._stores[strategy_id] = store
         return store
 
