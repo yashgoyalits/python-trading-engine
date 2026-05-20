@@ -1,12 +1,12 @@
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
-from src.managers.active_trades import ActiveTradesManager
+from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
 from src.infrastructure.logger import ShmLogger
 
 class TrailingManager:
-    def __init__(self, trades: ActiveTradesManager, executor: BaseExecutor, logger: ShmLogger):
+    def __init__(self, trades: ITradeStore, executor: BaseExecutor, logger: ShmLogger):
         self._trades   = trades
         self._executor = executor
         self._log      = logger
@@ -71,7 +71,8 @@ class TrailingManager:
  
             if ltp > float(lvl['threshold']):
                 self._log.info("I want to place and modify order")
-                active_trade_view['trailing'][i]['hit'] = True
+                trade_id = active_trade_view['order_id'].tobytes().rstrip(b'\x00').decode()
+                self._trades.mark_trailing_hit(trade_id, i)
                 # res = await self._place.modify_order(
                 #     stop_oid,
                 #     order_type=4,

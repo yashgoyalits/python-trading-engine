@@ -3,7 +3,7 @@ from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_CANDLE_HISTORY, TF_30S
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.logger import ShmLogger
-from src.managers.active_trades import ActiveTradesManager
+from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor 
 from src.strategies.strategy_one.trailing import TrailingManager
 from src.strategies.strategy_one.logic import StrategyLogicManager
@@ -14,7 +14,7 @@ class StrategyHandler:
         self,
         shm: ShmStore,
         symbols: SymbolRegistry,
-        trades: ActiveTradesManager,
+        trades: ITradeStore,
         executor: BaseExecutor,
         logger: ShmLogger,
         strategy_id: str,

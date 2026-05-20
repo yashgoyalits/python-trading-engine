@@ -1,25 +1,32 @@
 from collections import deque
 from src.core.shm_store import ShmStore
-from src.core.dtypes import MAX_ACTIVE_TRADES, MAX_TRAILING
+from src.core.dtypes import MAX_TRAILING
+
 
 class ActiveTradesManager:
-    def __init__(self, shm: ShmStore, strategy_id: str):
-        self._buf = shm.trades
-        self._sid = strategy_id.encode()
+    def __init__(
+        self,
+        shm: ShmStore,
+        strategy_id: str,
+        slot_start: int,
+        slot_count: int,
+    ):
+        self._buf  = shm.trades
+        self._sid  = strategy_id.encode()
 
-        # ── in-process indexes (O(1) lookup) ──────────────────
-        self._free: deque[int] = deque(range(MAX_ACTIVE_TRADES))  # free slot pool
-        self._idx:  dict[str, int] = {}   # order_id → slot index
-        self._active_slot: int | None = None  # cached active slot for this strategy
+        self._free: deque[int] = deque(range(slot_start, slot_start + slot_count))
+        self._idx:  dict[str, int] = {}
+        self._active_slot: int | None = None
 
     # ── write ops ─────────────────────────────────────────────
 
-    def add_trade(self, trade_no: int, order_id: str):
+    def add_trade(self, trade_no: int, order_id: str) -> None:
         if not self._free:
-            raise RuntimeError("MAX_ACTIVE_TRADES reached")
+            raise RuntimeError("slot_count exhausted for this strategy")
 
-        slot_i = self._free.popleft()           # O(1)
+        slot_i = self._free.popleft()
         r = self._buf[slot_i]
+
         r['active']          = True
         r['trade_no']        = trade_no
         r['strategy_id']     = self._sid
@@ -35,17 +42,16 @@ class ActiveTradesManager:
         r['trailing_count']  = 0
         r['trailing'][:]['hit'] = False
 
-        self._idx[order_id]  = slot_i           # register in index
-        self._active_slot    = slot_i           # cache it
+        self._idx[order_id] = slot_i
+        self._active_slot   = slot_i
 
-    def update(self, order_id: str, **kwargs):
+    def update(self, order_id: str, **kwargs) -> None:
         slot_i = self._idx.get(order_id)
         if slot_i is None:
             return
         r = self._buf[slot_i]
 
         for k, v in kwargs.items():
-
             if k == 'trailing_levels':
                 for i, lvl in enumerate(v[:MAX_TRAILING]):
                     r['trailing'][i]['threshold'] = lvl['threshold']
@@ -53,7 +59,7 @@ class ActiveTradesManager:
                     r['trailing'][i]['hit']       = lvl.get('hit', False)
                 r['trailing_count'] = len(v)
 
-            elif k in ('stop_order_id', 'target_order_id'):
+            elif k in ('stop_order_id', 'target_order_id', 'order_id'):
                 r[k] = v.encode()[:64]
 
             elif k in ('symbol', 'strategy_id'):
@@ -62,13 +68,19 @@ class ActiveTradesManager:
             else:
                 r[k] = v
 
-    def close_trade(self, order_id: str):
-        slot_i = self._idx.pop(order_id, None)  # O(1)
+    def close_trade(self, order_id: str) -> None:
+        slot_i = self._idx.pop(order_id, None)
         if slot_i is None:
             return
         self._buf[slot_i]['active'] = False
-        self._free.append(slot_i)               # slot wapas pool mein
+        self._free.append(slot_i)
         self._active_slot = None
+
+    def mark_trailing_hit(self, order_id: str, level_idx: int) -> None:
+        slot_i = self._idx.get(order_id)
+        if slot_i is None:
+            return
+        self._buf[slot_i]['trailing'][level_idx]['hit'] = True
 
     # ── read ops ──────────────────────────────────────────────
 
@@ -76,29 +88,23 @@ class ActiveTradesManager:
         if self._active_slot is None:
             return None
 
-        slot = self._active_slot
-        row  = self._buf[slot]
+        slot_i = self._active_slot
+        row    = self._buf[slot_i]
 
-        # 1. active check
         if not row['active']:
             self._active_slot = None
             return None
 
-        # 2. order_id consistency check (IMPORTANT)
-        oid = row['order_id'].tobytes().rstrip(b'\x00').decode()
+        if row['strategy_id'].tobytes().rstrip(b'\x00') != self._sid.rstrip(b'\x00'):
+            self._active_slot = None
+            return None
 
-        if self._idx.get(oid) != slot:
-            # matlab slot reuse ho gaya ya external modify hua
+        oid = row['order_id'].tobytes().rstrip(b'\x00').decode()
+        if self._idx.get(oid) != slot_i:
             self._active_slot = None
             return None
 
         return row
 
-    # ── internal ──────────────────────────────────────────────
-
-    def _get_by_id(self, order_id: str):
-        """O(1) dict lookup instead of O(n) loop."""
-        slot_i = self._idx.get(order_id)
-        if slot_i is None:
-            return None
-        return self._buf[slot_i]
+    def has_active(self) -> bool:
+        return self.get_active() is not None

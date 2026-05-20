@@ -9,7 +9,7 @@ from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
 from src.managers.candle_builder import CandleBuilder
-from src.managers.active_trades import ActiveTradesManager
+from src.trade_store import TradeRegistry
 from src.managers.order_feed_manager import OrderFeedManager
 from src.strategies.strategy_one.handler import StrategyHandler
 
@@ -50,7 +50,9 @@ async def main():
     data_broker.subscribe(["NSE:NIFTY50-INDEX"])
 
     # ── 6. Shared objects ─────────────────────────────────────
-    trades         = ActiveTradesManager(shm, "STRATEGY_ONE")
+    registry = TradeRegistry(shm)
+    trades   = registry.register("STRATEGY_ONE", slot_count=1)
+    # ──  ─────────────────────────────────────
     trailing_event = asyncio.Event()
     csv_logger     = TradeCSVLogger("trades.csv")
 

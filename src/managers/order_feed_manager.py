@@ -1,7 +1,7 @@
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
-from src.managers.active_trades import ActiveTradesManager
+from src.trade_store import ITradeStore
 from src.infrastructure.logger import ShmLogger
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
@@ -10,7 +10,7 @@ class OrderFeedManager:
     def __init__(
         self,
         shm: ShmStore,
-        trades: ActiveTradesManager,
+        trades: ITradeStore,
         logger: ShmLogger,
         trailing_event: asyncio.Event,
         csv_logger: TradeCSVLogger,
