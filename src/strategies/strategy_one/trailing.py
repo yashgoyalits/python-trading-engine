@@ -1,5 +1,5 @@
 import asyncio
-from src.logger import ShmLogger
+from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
 from src.trade_store import ITradeStore
