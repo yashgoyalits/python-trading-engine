@@ -30,7 +30,6 @@ class Engine:
         registry             = TradeRegistry(self._shm)
         active_trade_manager = registry.register("STRATEGY_ONE")
 
-        trailing_event = asyncio.Event()
         csv_logger     = TradeCSVLogger("trades.csv")
 
         self._candles = CandleBuilder(
@@ -46,7 +45,6 @@ class Engine:
             logger=self._logger,
             strategy_id="STRATEGY_ONE",
             sym_name="NSE:NIFTY50-INDEX",
-            trailing_event=trailing_event,
             csv_logger=csv_logger,
             max_trades=1,
         )

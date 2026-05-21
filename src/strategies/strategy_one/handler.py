@@ -20,7 +20,6 @@ class StrategyHandler:
         logger: ShmLogger,
         strategy_id: str,
         sym_name: str,
-        trailing_event: asyncio.Event,
         csv_logger: TradeCSVLogger,
         max_trades: int = 1,
     ):
@@ -32,7 +31,7 @@ class StrategyHandler:
         self._max      = max_trades
         self._done     = 0
 
-        self._trailing_event = trailing_event
+        self._trailing_event = asyncio.Event()
 
         # ── sub-components ─────────────────────────────────────
         self._candle_loop = EntryDetectionLoop(
@@ -49,7 +48,7 @@ class StrategyHandler:
             shm=shm,
             trades=trades,
             logger=logger,
-            trailing_event=trailing_event,
+            trailing_event=self._trailing_event,
             csv_logger=csv_logger,
             strategy_id=strategy_id,
         )
