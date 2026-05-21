@@ -57,7 +57,7 @@ class FyersDataBroker:
             log.info(f"Fyers data WS closed: {msg}")
 
         def _on_error(err):
-            self._log.error(f"Fyers data WS error: {err}")
+            log.error(f"Fyers data WS error: {err}")
 
         def _on_message(msg):
             if msg.get("type") not in ("if", "sf"):

@@ -30,9 +30,10 @@ class FyersOrderBroker:
         self._thread.start()
 
     def disconnect(self):
+        self._running = False
         self._connected = False
-        if hasattr(self._fyers, 'ws') and self._fyers.ws:
-            self._fyers.ws.close(status=1000)
+        if self._socket:
+            self._socket.close_connection()
 
     # ── callbacks (run in WS thread) ───────────────────────────
 
