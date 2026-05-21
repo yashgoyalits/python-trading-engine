@@ -4,7 +4,6 @@ from src.logger import log, stop_log_listener
 from src.core.shm_store import ShmStore
 from src.core.dtypes import TF_30S, TF_1M, TF_3M
 from src.infrastructure.shm_symbols import SymbolRegistry
-from src.infrastructure.trade_csv_logger import TradeCSVLogger
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
@@ -29,8 +28,6 @@ class Engine:
         registry             = TradeRegistry(self._shm)
         active_trade_manager = registry.register("STRATEGY_ONE")
 
-        csv_logger     = TradeCSVLogger("trades.csv")
-
         self._candles = CandleBuilder(
             self._shm, self._syms,
             watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
@@ -42,7 +39,6 @@ class Engine:
             executor=self._executor,
             strategy_id="STRATEGY_ONE",
             sym_name="NSE:NIFTY50-INDEX",
-            csv_logger=csv_logger,
             max_trades=1,
         )
         log.info("Engine: init done")

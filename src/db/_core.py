@@ -1,4 +1,4 @@
-import csv
+import csv as _csv        # ← alias karo, collision khatam
 import os
 import time
 from pathlib import Path
@@ -10,7 +10,6 @@ _FIELDS = (
     "closed_at",
 )
 
-# Project root = is file se 3 levels upar (infrastructure → src → root)
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CSV_DIR      = _PROJECT_ROOT / "csv"
 
@@ -21,9 +20,9 @@ class TradeCSVLogger:
         self._path = _CSV_DIR / filename
         if not self._path.exists():
             with open(self._path, "w", newline="") as f:
-                csv.writer(f).writerow(_FIELDS)
+                _csv.writer(f).writerow(_FIELDS)   # ← _csv
 
-    def close(self, trade_view) -> None:
+    def log_close(self, trade_view) -> None:
         row = (
             int(trade_view["trade_no"]),
             trade_view["strategy_id"].tobytes().rstrip(b"\x00").decode(),
@@ -39,6 +38,7 @@ class TradeCSVLogger:
             time.time(),
         )
         with open(self._path, "a", newline="") as f:
-            csv.writer(f).writerow(row)
+            _csv.writer(f).writerow(row)           # ← _csv
+
 
 csv = TradeCSVLogger()

@@ -2,7 +2,6 @@ import asyncio
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.infrastructure.shm_symbols import SymbolRegistry
-from src.infrastructure.trade_csv_logger import TradeCSVLogger
 from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.entry_detection import EntryDetectionLoop
@@ -19,7 +18,6 @@ class StrategyHandler:
         executor: BaseExecutor,
         strategy_id: str,
         sym_name: str,
-        csv_logger: TradeCSVLogger,
         max_trades: int = 1,
     ):
         self._shm      = shm
@@ -45,7 +43,6 @@ class StrategyHandler:
             shm=shm,
             trades=trades,
             trailing_event=self._trailing_event,
-            csv_logger=csv_logger,
             strategy_id=strategy_id,
         )
         self._trailing = TrailingManager(trades, executor)

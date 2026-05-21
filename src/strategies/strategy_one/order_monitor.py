@@ -1,9 +1,9 @@
 import asyncio
 from src.logger import log
+from src.db import csv
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
 from src.trade_store import ITradeStore
-from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
 
 class OrderMonitor:
@@ -12,13 +12,11 @@ class OrderMonitor:
         shm: ShmStore,
         trades: ITradeStore,
         trailing_event: asyncio.Event,
-        csv_logger: TradeCSVLogger,
         strategy_id: str,
     ):
         self._shm            = shm
         self._trades         = trades
         self._trailing_event = trailing_event
-        self._csv            = csv_logger
         self._sid            = strategy_id
 
     # ── main loop ─────────────────────────────────────────────
@@ -99,7 +97,7 @@ class OrderMonitor:
 
             if status == 2:
                 log.info(f"[{self._sid}] Child filled | {order_id}")
-                self._csv.log_close(trade)
+                csv.log_close(trade)
                 self._trades.close_trade(trade_id)
 
             if status == 1:
