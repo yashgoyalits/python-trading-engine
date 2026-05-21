@@ -6,11 +6,9 @@ from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
 
 class TrailingManager:
-    def __init__(self, trades: ITradeStore, executor: BaseExecutor, logger: ShmLogger):
+    def __init__(self, trades: ITradeStore, executor: BaseExecutor):
         self._trades   = trades
         self._executor = executor
-        self._log      = logger
-
     
     async def run(self, sym_idx: int, shm: ShmStore, event: asyncio.Event):
         ctrl      = shm.ctrl[sym_idx]
@@ -20,13 +18,13 @@ class TrailingManager:
             await event.wait()
 
             last_read_widx = int(ctrl['tick_widx'])     # ← event fire hone ke waqt se start
-            self._log.info("TrailingManager: active, ticks watch kar raha hai")
+            log.info("TrailingManager: active, ticks watch kar raha hai")
 
             while True:
                 trade = self._trades.get_active()
                 if trade is None:
                     event.clear()
-                    self._log.info("TrailingManager: trade closed, so raha hai")
+                    log.info("TrailingManager: trade closed, so raha hai")
                     break
 
                 await asyncio.sleep(0.001)
@@ -70,7 +68,7 @@ class TrailingManager:
                 continue
  
             if ltp > float(lvl['threshold']):
-                self._log.info("I want to place and modify order")
+                log.info("I want to place and modify order")
                 trade_id = active_trade_view['order_id'].tobytes().rstrip(b'\x00').decode()
                 self._trades.mark_trailing_hit(trade_id, i)
                 # res = await self._place.modify_order(
@@ -83,7 +81,7 @@ class TrailingManager:
                 # if res.get('code') == 1102:
                 #     # Hit flag seedha SHM mein likho
                 #     active_trade_view['trailing'][i]['hit'] = True
-                #     self._log.info(f"TrailingManager: level {i} hit | LTP {ltp}")
+                #     log.info(f"TrailingManager: level {i} hit | LTP {ltp}")
                 # else:
                 #     self._log.error(f"TrailingManager: modify failed level {i} | {res}")
  

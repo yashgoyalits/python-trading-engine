@@ -1,5 +1,4 @@
 import asyncio
-from src.logger import ShmLogger
 from src.core.shm_store import ShmStore
 from src.core.dtypes import (
     MAX_SYMBOLS, MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY,
@@ -17,13 +16,12 @@ _TF_META = {
 
 class CandleBuilder:
     def __init__(self, shm: ShmStore, symbols: SymbolRegistry,
-                 watched: dict[str, list[int]], logger: ShmLogger):
+                 watched: dict[str, list[int]]):
         """
         watched: { "NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M], ... }
         """
         self._shm     = shm
         self._symbols = symbols
-        self._log     = logger
 
         # Convert to idx-based
         self._watched: dict[int, list[int]] = {

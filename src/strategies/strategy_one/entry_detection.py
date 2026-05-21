@@ -1,12 +1,11 @@
 import asyncio
 from typing import Callable
-from src.logger import ShmLogger
+from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_CANDLE_HISTORY
 from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.logic import StrategyLogicManager
-
 
 class EntryDetectionLoop:
     def __init__(
@@ -15,7 +14,6 @@ class EntryDetectionLoop:
         sym_idx: int,
         trades: ITradeStore,
         executor: BaseExecutor,
-        logger: ShmLogger,
         strategy_id: str,
         on_trade_placed: Callable[[str], None],
         is_max_reached: Callable[[], bool],
@@ -24,7 +22,6 @@ class EntryDetectionLoop:
         self._sym_idx  = sym_idx
         self._trades   = trades
         self._executor = executor
-        self._log      = logger
         self._sid      = strategy_id
         self._logic    = StrategyLogicManager()
 
@@ -56,7 +53,7 @@ class EntryDetectionLoop:
 
                 if trade is None:
                     if self._is_max_reached():
-                        self._log.info(
+                        log.info(
                             f"[{self._sid}] Max trade limit reached. Stopping candle loop."
                         )
                         return
@@ -65,7 +62,7 @@ class EntryDetectionLoop:
                         await self._enter()
 
         except asyncio.CancelledError:
-            self._log.info(f"[{self._sid}] candle_loop cancelled.")
+            log.info(f"[{self._sid}] candle_loop cancelled.")
 
     # ── entry ─────────────────────────────────────────────────
 
@@ -77,4 +74,4 @@ class EntryDetectionLoop:
         if res.get('code') == 1101:
             self._on_trade_placed(res.get("id", ""))
         else:
-            self._log.error(f"[{self._sid}] Order placement failed: {res}")
+            log.error(f"[{self._sid}] Order placement failed: {res}")

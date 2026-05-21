@@ -1,5 +1,5 @@
 import asyncio
-from src.logger import ShmLogger
+from src.logger import log
 from src.core.shm_store import ShmStore
 from src.infrastructure.shm_symbols import SymbolRegistry
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
@@ -17,7 +17,6 @@ class StrategyHandler:
         symbols: SymbolRegistry,
         trades: ITradeStore,
         executor: BaseExecutor,
-        logger: ShmLogger,
         strategy_id: str,
         sym_name: str,
         csv_logger: TradeCSVLogger,
@@ -26,7 +25,6 @@ class StrategyHandler:
         self._shm      = shm
         self._sym_idx  = symbols.idx(sym_name)
         self._trades   = trades
-        self._log      = logger
         self._sid      = strategy_id
         self._max      = max_trades
         self._done     = 0
@@ -39,7 +37,6 @@ class StrategyHandler:
             sym_idx=self._sym_idx,
             trades=trades,
             executor=executor,
-            logger=logger,
             strategy_id=strategy_id,
             on_trade_placed=self._on_trade_placed,
             is_max_reached=self.is_max_reached,
@@ -47,12 +44,11 @@ class StrategyHandler:
         self._order_monitor = OrderMonitor(
             shm=shm,
             trades=trades,
-            logger=logger,
             trailing_event=self._trailing_event,
             csv_logger=csv_logger,
             strategy_id=strategy_id,
         )
-        self._trailing = TrailingManager(trades, executor, logger)
+        self._trailing = TrailingManager(trades, executor)
 
     # ── lifecycle ──────────────────────────────────────────────
 
@@ -73,10 +69,10 @@ class StrategyHandler:
         try:
             # Block here — candle_loop returns only when max_trades exhausted
             await candle_task
-            self._log.info(f"[{self._sid}] Candle loop complete")
+            log.info(f"[{self._sid}] Candle loop complete")
 
         except asyncio.CancelledError:
-            self._log.info(f"[{self._sid}] Cancelled externally")
+            log.info(f"[{self._sid}] Cancelled externally")
             candle_task.cancel()
             await asyncio.gather(candle_task, return_exceptions=True)
             raise
@@ -86,14 +82,14 @@ class StrategyHandler:
             for t in support_tasks:
                 t.cancel()
             await asyncio.gather(*support_tasks, return_exceptions=True)
-            self._log.info(f"[{self._sid}] Support tasks stopped")
+            log.info(f"[{self._sid}] Support tasks stopped")
 
     # ── trade count management ─────────────────────────────────
 
     def _on_trade_placed(self, order_id: str):
         self._done += 1
         self._trades.add_trade(self._done, order_id)
-        self._log.info(f"[{self._sid}] Order placed #{self._done} | {order_id}")
+        log.info(f"[{self._sid}] Order placed #{self._done} | {order_id}")
 
     def is_max_reached(self) -> bool:
         return self._done >= self._max

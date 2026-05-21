@@ -1,5 +1,5 @@
 import asyncio
-from src.logger import ShmLogger
+from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
 from src.trade_store import ITradeStore
@@ -11,14 +11,12 @@ class OrderMonitor:
         self,
         shm: ShmStore,
         trades: ITradeStore,
-        logger: ShmLogger,
         trailing_event: asyncio.Event,
         csv_logger: TradeCSVLogger,
         strategy_id: str,
     ):
         self._shm            = shm
         self._trades         = trades
-        self._log            = logger
         self._trailing_event = trailing_event
         self._csv            = csv_logger
         self._sid            = strategy_id
@@ -48,7 +46,7 @@ class OrderMonitor:
                     last_read_widx = (last_read_widx + 1) % MAX_ORDERS
 
         except asyncio.CancelledError:
-            self._log.info(f"[{self._sid}] OrderMonitor: cancelled")
+            log.info(f"[{self._sid}] OrderMonitor: cancelled")
 
     # ── order filtering ───────────────────────────────────────
 
@@ -79,7 +77,7 @@ class OrderMonitor:
                 qty          = int(slot['qty'])
                 traded_price = float(slot['traded_price'])
                 symbol       = slot['symbol'].tobytes().rstrip(b'\x00').decode()
-                self._log.info(f"[{self._sid}] Parent filled | {order_id}")
+                log.info(f"[{self._sid}] Parent filled | {order_id}")
                 self._trades.update(trade_id, symbol=symbol, qty=qty, entry_price=traded_price)
                 self._trades.update(trade_id, trailing_levels=self._calc_trailing(traded_price))
                 self._trailing_event.set()
@@ -90,22 +88,22 @@ class OrderMonitor:
             if status == 6 and order_type == 4:
                 stop_price = float(slot['stop_price'])
                 if order_id != trade['stop_order_id'].tobytes().rstrip(b'\x00').decode():
-                    self._log.info(f"[{self._sid}] Child SL update")
+                    log.info(f"[{self._sid}] Child SL update")
                     self._trades.update(trade_id, stop_order_id=order_id, stop_price=stop_price)
 
             if status == 6 and order_type == 1:
                 limit_price = float(slot['limit_price'])
                 if order_id != trade['target_order_id'].tobytes().rstrip(b'\x00').decode():
-                    self._log.info(f"[{self._sid}] Child TP update")
+                    log.info(f"[{self._sid}] Child TP update")
                     self._trades.update(trade_id, target_order_id=order_id, target_price=limit_price)
 
             if status == 2:
-                self._log.info(f"[{self._sid}] Child filled | {order_id}")
+                log.info(f"[{self._sid}] Child filled | {order_id}")
                 self._csv.log_close(trade)
                 self._trades.close_trade(trade_id)
 
             if status == 1:
-                self._log.info(f"[{self._sid}] Child cancelled | {order_id}")
+                log.info(f"[{self._sid}] Child cancelled | {order_id}")
 
     # ── trailing calc ─────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import os
 import asyncio
 import threading
-from src.logger import ShmLogger
+from src.logger import log
 from fyers_apiv3.FyersWebsocket import order_ws
 from dotenv import load_dotenv
 from src.core.shm_store import ShmStore
@@ -10,9 +10,8 @@ from src.core.dtypes import MAX_ORDERS
 load_dotenv()
 
 class FyersOrderBroker:
-    def __init__(self, shm: ShmStore, logger: ShmLogger):
+    def __init__(self, shm: ShmStore):
         self._shm   = shm
-        self._log   = logger
         self._client_id = os.getenv("CLIENT_ID")
         self._token     = os.getenv("FYERS_ACCESS_TOKEN")
         self._socket  = None
@@ -42,13 +41,13 @@ class FyersOrderBroker:
             self._connected = True
             self._fyers.subscribe(data_type="OnOrders")
             self._fyers.subscribe(data_type="OnPositions")
-            self._log.info("Fyers order WS connected")
+            log.info("Fyers order WS connected")
 
         def _on_close(msg):
             self._connected = False
 
         def _on_error(msg):
-            self._log.error(f"Fyers order WS error: {msg}")
+            log.error(f"Fyers order WS error: {msg}")
 
         def _on_order(msg):
             orders = msg.get("orders") or []

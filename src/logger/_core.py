@@ -71,3 +71,5 @@ class ShmLogger:
     def info(self, msg: str):    self._write(self.INFO,    msg)
     def warning(self, msg: str): self._write(self.WARNING, msg)
     def error(self, msg: str):   self._write(self.ERROR,   msg)
+
+log = ShmLogger()

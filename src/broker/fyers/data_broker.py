@@ -2,7 +2,7 @@ import os
 import asyncio
 import threading
 from dotenv import load_dotenv
-from src.logger import ShmLogger
+from src.logger import log
 from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
 from src.infrastructure.shm_symbols import SymbolRegistry
@@ -12,10 +12,9 @@ load_dotenv()
 
 
 class FyersDataBroker:
-    def __init__(self, shm: ShmStore, symbols: SymbolRegistry, logger: ShmLogger):
+    def __init__(self, shm: ShmStore, symbols: SymbolRegistry):
         self._shm     = shm
         self._symbols = symbols
-        self._log     = logger
         self._token   = os.getenv("FYERS_ACCESS_TOKEN")
         self._socket  = None
         self._thread  = None
@@ -51,11 +50,11 @@ class FyersDataBroker:
     def _run_ws(self):
         def _on_open():
             self._connected = True
-            self._log.info("Fyers data WS connected")
+            log.info("Fyers data WS connected")
 
         def _on_close(msg):
             self._connected = False
-            self._log.info(f"Fyers data WS closed: {msg}")
+            log.info(f"Fyers data WS closed: {msg}")
 
         def _on_error(err):
             self._log.error(f"Fyers data WS error: {err}")
