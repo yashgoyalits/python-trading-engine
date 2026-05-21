@@ -1,9 +1,9 @@
 import asyncio
+from src.logger import ShmLogger
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
 from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
-from src.infrastructure.logger import ShmLogger
 
 class TrailingManager:
     def __init__(self, trades: ITradeStore, executor: BaseExecutor, logger: ShmLogger):

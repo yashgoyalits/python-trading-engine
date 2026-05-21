@@ -1,10 +1,10 @@
 import asyncio
 from typing import Callable
+from src.logger import ShmLogger
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_CANDLE_HISTORY
 from src.trade_store import ITradeStore
 from src.executor.base_executor import BaseExecutor
-from src.infrastructure.logger import ShmLogger
 from src.strategies.strategy_one.logic import StrategyLogicManager
 
 

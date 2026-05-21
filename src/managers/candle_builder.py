@@ -1,11 +1,11 @@
 import asyncio
+from src.logger import ShmLogger
 from src.core.shm_store import ShmStore
 from src.core.dtypes import (
     MAX_SYMBOLS, MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY,
     TF_30S, TF_1M, TF_3M,
 )
 from src.infrastructure.shm_symbols import SymbolRegistry
-from src.infrastructure.logger import ShmLogger
 
 # Maps timeframe → ctrl field names + candle array
 _TF_META = {

@@ -1,8 +1,8 @@
 import asyncio
+from src.logger import ShmLogger
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
 from src.trade_store import ITradeStore
-from src.infrastructure.logger import ShmLogger
 from src.infrastructure.trade_csv_logger import TradeCSVLogger
 
 

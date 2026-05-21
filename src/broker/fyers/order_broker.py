@@ -1,15 +1,13 @@
 import os
 import asyncio
 import threading
+from src.logger import ShmLogger
 from fyers_apiv3.FyersWebsocket import order_ws
 from dotenv import load_dotenv
-
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
-from src.infrastructure.logger import ShmLogger
 
 load_dotenv()
-
 
 class FyersOrderBroker:
     def __init__(self, shm: ShmStore, logger: ShmLogger):
