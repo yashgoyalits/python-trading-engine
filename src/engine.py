@@ -10,7 +10,6 @@ from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
 from src.managers.candle_builder import CandleBuilder
 from src.trade_store import TradeRegistry
-from src.managers.order_feed_manager import OrderFeedManager
 from src.strategies.strategy_one.handler import StrategyHandler
 
 
@@ -39,13 +38,6 @@ class Engine:
             watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
             logger=self._logger,
         )
-        self._order_feed = OrderFeedManager(
-            shm=self._shm,
-            registry=registry,
-            logger=self._logger,
-            trailing_event=trailing_event,
-            csv_logger=csv_logger,
-        )
         self._strategy = StrategyHandler(
             shm=self._shm,
             symbols=self._syms,
@@ -55,6 +47,7 @@ class Engine:
             strategy_id="STRATEGY_ONE",
             sym_name="NSE:NIFTY50-INDEX",
             trailing_event=trailing_event,
+            csv_logger=csv_logger,
             max_trades=1,
         )
         self._logger.info("Engine: init done")
@@ -75,7 +68,7 @@ class Engine:
         self._data_broker.subscribe(["NSE:NIFTY50-INDEX"])
         self._logger.info("Engine: start done — all connections live")
 
-    # ── Phase 3: Run — strategy primary, support subordinate ──
+    # ── Phase 3: Run — strategy primary, candles subordinate ──
     async def _run(self) -> None:
         self._logger.info("Engine: running")
 
@@ -83,8 +76,7 @@ class Engine:
             self._strategy.run(), name="strategy"
         )
         support_tasks = [
-            asyncio.create_task(self._candles.run(),    name="candles"),
-            asyncio.create_task(self._order_feed.run(), name="order_feed"),
+            asyncio.create_task(self._candles.run(), name="candles"),
         ]
 
         try:
