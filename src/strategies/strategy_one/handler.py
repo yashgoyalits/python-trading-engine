@@ -68,6 +68,9 @@ class StrategyHandler:
             side = await self._entry_loop.run()
             log.info(f"[{self._sid}] Signal: side={side}")
 
+            # ───── dynamic strike price calcualtion later ───── 
+            ### retun the symbol in which i want to take the trade
+
             # ── 2. Handler place karta hai ────────────────────
             res = await self._executor.place_order(
                 symbol="NSE:IDEA-EQ",
