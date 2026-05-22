@@ -20,7 +20,7 @@ class Engine:
         tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 
         self._shm     = ShmStore(timeframes=tfs, create=True)
-        self._symbols = SymbolManager()
+        self._symbols = SymbolManager(timeframes=tfs)
 
         self._data_broker  = FyersDataBroker(self._shm, self._symbols)
         self._order_broker = FyersOrderBroker(self._shm)
@@ -30,7 +30,7 @@ class Engine:
 
         for scfg in cfg['strategies']:
             for sym in scfg['symbols']:
-                self._symbols.add(sym, tfs)
+                self._symbols.add(sym)
 
         registry = TradeRegistry(self._shm)
 

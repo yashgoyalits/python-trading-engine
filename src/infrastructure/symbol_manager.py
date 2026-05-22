@@ -14,11 +14,12 @@ class SymbolManager:
     set_broker() alag se call karo (engine._init() mein).
     """
 
-    def __init__(self):
-        self._map: dict[str, int] = {}        # symbol → shm idx
-        self._tfs: dict[int, list[int]] = {}  # idx    → timeframes
+    def __init__(self, timeframes: list[int]):  # ← yahan le lo
+        self._map = {}
+        self._tfs: dict[int, list[int]] = {}
+        self._tfs_default = timeframes          # ← store kar lo
         self._next_idx = 0
-        self._broker = None                   # set_broker() se milega
+        self._broker = None                  # set_broker() se milega
 
     # ── broker wire ───────────────────────────────────────────
 
@@ -28,7 +29,7 @@ class SymbolManager:
 
     # ── public API ────────────────────────────────────────────
 
-    def add(self, symbol: str, timeframes: list[int]) -> int:
+    def add(self, symbol: str) -> int:
         """
         Symbol register karo + broker ko subscribe karo.
         Agar symbol pehle se hai toh sirf timeframes update hote hain.
@@ -41,7 +42,7 @@ class SymbolManager:
             self._next_idx += 1
 
         idx = self._map[symbol]
-        self._tfs[idx] = list(timeframes)
+        self._tfs[idx] = self._tfs_default
 
         if self._broker is not None:
             self._broker.subscribe([symbol])
