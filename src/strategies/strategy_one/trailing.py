@@ -42,7 +42,6 @@ class TrailingManager:
                         # data read between s1 and s2
                         slot = shm.ticks[tick_base + last_read_widx]
                         ltp  = float(slot['ltp'])
-                        ts   = float(slot['timestamp'])
 
                         s2 = int(ctrl['tick_seq'])
                         if s1 == s2:
