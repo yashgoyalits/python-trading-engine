@@ -1,17 +1,8 @@
 # src/managers/candle_builder.py
 import asyncio
 from src.core.shm_store import ShmStore
-from src.core.dtypes import (
-    MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY,
-    TF_30S, TF_1M, TF_3M,
-)
+from src.core.dtypes import MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY
 from src.infrastructure.symbol_manager import SymbolManager
-
-_TF_META = {
-    TF_30S: ('c30s_seq', 'c30s_widx', 'c30s_bucket', 'candles_30s'),
-    TF_1M:  ('c1m_seq',  'c1m_widx',  'c1m_bucket',  'candles_1m'),
-    TF_3M:  ('c3m_seq',  'c3m_widx',  'c3m_bucket',  'candles_3m'),
-}
 
 
 class CandleBuilder:
@@ -20,11 +11,9 @@ class CandleBuilder:
         self._manager = manager
 
     async def run(self):
-        # Per-symbol last read pointer — lazily populated as symbols arrive
         last_widx: dict[int, int | None] = {}
 
         while True:
-            # Live snapshot — runtime add() calls automatically picked up
             subscriptions = self._manager.subscriptions()
 
             for sym_idx, timeframes in subscriptions.items():
@@ -71,28 +60,26 @@ class CandleBuilder:
 
             await asyncio.sleep(0.001)
 
-    # ── candle logic (unchanged) ───────────────────────────────
-
     def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
-        seq_f, widx_f, bucket_f, arr_attr = _TF_META[tf]
+        # ctrl[sym_idx] mein hi sab hai — pehle jaisa ek hi array
         ctrl    = self._shm.ctrl[sym_idx]
-        candles = getattr(self._shm, arr_attr)
+        candles = self._shm.candles[tf]
         bucket  = int(ts // tf)
         base    = sym_idx * MAX_CANDLE_HISTORY
-        widx    = int(ctrl[widx_f])
-        last_b  = int(ctrl[bucket_f])
+        widx    = int(ctrl[f'c{tf}_widx'])
+        last_b  = int(ctrl[f'c{tf}_bucket'])
 
         if last_b == 0:
-            ctrl[bucket_f] = bucket
+            ctrl[f'c{tf}_bucket'] = bucket
             self._open_candle(candles[base + widx], ts, ltp, vol)
             return
 
         if bucket != last_b:
             candles[base + widx]['seq'] += 1
-            new_widx = (widx + 1) % MAX_CANDLE_HISTORY
-            ctrl[bucket_f] = bucket
-            ctrl[widx_f]   = new_widx
-            ctrl[seq_f]   += 1
+            new_widx              = (widx + 1) % MAX_CANDLE_HISTORY
+            ctrl[f'c{tf}_bucket'] = bucket
+            ctrl[f'c{tf}_widx']   = new_widx
+            ctrl[f'c{tf}_seq']   += 1
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
         else:
             c = candles[base + widx]

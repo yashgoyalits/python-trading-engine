@@ -17,8 +17,9 @@ class Engine:
     # ── Phase 1: Init ─────────────────────────────────────────
     def _init(self) -> None:
         cfg = load()
+        tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 
-        self._shm     = ShmStore(create=True)
+        self._shm     = ShmStore(timeframes=tfs, create=True)
         self._symbols = SymbolManager()
 
         self._data_broker  = FyersDataBroker(self._shm, self._symbols)
@@ -27,8 +28,6 @@ class Engine:
 
         self._symbols.set_broker(self._data_broker)
 
-        # Config se symbols + timeframes register karo
-        tfs = cfg['timeframes']
         for scfg in cfg['strategies']:
             for sym in scfg['symbols']:
                 self._symbols.add(sym, tfs)
@@ -37,7 +36,6 @@ class Engine:
 
         self._candles = CandleBuilder(self._shm, self._symbols)
 
-        # Abhi ek hi strategy — baad mein loop bana lena
         scfg = cfg['strategies'][0]
         self._strategy = StrategyHandler(
             shm=self._shm,

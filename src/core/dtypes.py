@@ -7,10 +7,6 @@ MAX_ACTIVE_TRADES    = 10
 MAX_TRAILING         = 5
 MAX_ORDERS           = 200
 
-TF_30S = 30
-TF_1M  = 60
-TF_3M  = 180
-
 TICK_DTYPE = np.dtype([
     ('seq',        np.uint64),
     ('timestamp',  np.float64),
@@ -32,40 +28,47 @@ CANDLE_DTYPE = np.dtype([
     ('start_time', np.float64),
 ])
 
-# Per-symbol control — seq counters + write indices + bucket tracking
-CTRL_DTYPE = np.dtype([
-    ('tick_seq',        np.uint64),
-    ('tick_widx',       np.uint32),
 
-    ('c30s_seq',        np.uint64),
-    ('c30s_widx',       np.uint32),
-    ('c30s_bucket',     np.int64),
+def make_ctrl_dtype(timeframes: list[int]) -> np.dtype:
+    """
+    Config ke timeframes se CTRL_DTYPE dynamically banao.
+    Tick fields hamesha rahenge, candle fields TF list se generate honge.
 
-    ('c1m_seq',         np.uint64),
-    ('c1m_widx',        np.uint32),
-    ('c1m_bucket',      np.int64),
+    e.g. timeframes=[30, 60, 180] =>
+        tick_seq, tick_widx,
+        c30_seq, c30_widx, c30_bucket,
+        c60_seq, c60_widx, c60_bucket,
+        c180_seq, c180_widx, c180_bucket,
+        _pad
+    """
+    fields = [
+        ('tick_seq',  np.uint64),
+        ('tick_widx', np.uint32),
+    ]
+    for tf in timeframes:
+        fields += [
+            (f'c{tf}_seq',    np.uint64),
+            (f'c{tf}_widx',   np.uint32),
+            (f'c{tf}_bucket', np.int64),
+        ]
+    fields.append(('_pad', np.uint8, (4,)))
+    return np.dtype(fields)
 
-    ('c3m_seq',         np.uint64),
-    ('c3m_widx',        np.uint32),
-    ('c3m_bucket',      np.int64),
-
-    ('_pad',            np.uint8, (4,)),
-])
 
 ORDER_DTYPE = np.dtype([
-    ('seq',          np.uint64),
-    ('status',       np.int8),
-    ('order_type',   np.int8),
-    ('side',         np.int8),
-    ('_pad',         np.uint8, (5,)),
-    ('qty',          np.int32),
-    ('stop_price',   np.float64),
-    ('limit_price',  np.float64),
-    ('traded_price', np.float64),
-    ('order_id',     'S64'),
-    ('parent_id',    'S64'),
-    ('symbol',       'S32'),
-    ('order_datetime',   'S32'),
+    ('seq',            np.uint64),
+    ('status',         np.int8),
+    ('order_type',     np.int8),
+    ('side',           np.int8),
+    ('_pad',           np.uint8, (5,)),
+    ('qty',            np.int32),
+    ('stop_price',     np.float64),
+    ('limit_price',    np.float64),
+    ('traded_price',   np.float64),
+    ('order_id',       'S64'),
+    ('parent_id',      'S64'),
+    ('symbol',         'S32'),
+    ('order_datetime', 'S32'),
 ])
 
 TRAILING_DTYPE = np.dtype([
@@ -94,7 +97,6 @@ TRADE_DTYPE = np.dtype([
     ('trailing',        TRAILING_DTYPE, (MAX_TRAILING,)),
 ])
 
-# Global order ring buffer control
 ORDER_CTRL_DTYPE = np.dtype([
     ('widx', np.uint32),
     ('seq',  np.uint64),
