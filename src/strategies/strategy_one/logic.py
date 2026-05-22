@@ -1,4 +1,4 @@
-class StrategyLogicManager:
+class EntryLogic:
     def check_entry(self, candle) -> bool:
         """candle is a direct numpy row view."""
         o = float(candle['open'])

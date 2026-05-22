@@ -2,7 +2,7 @@ from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TRAILING
 
 
-class ActiveTradesManager:
+class ActiveTradeManager:
     def __init__(
         self,
         shm: ShmStore,

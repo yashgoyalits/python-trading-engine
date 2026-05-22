@@ -1,1 +1,1 @@
-from src.logger._core import ShmLogger, stop_log_listener, log
+from src.logger._core import Logger, stop_log_listener, log

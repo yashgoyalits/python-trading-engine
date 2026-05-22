@@ -55,7 +55,7 @@ def stop_log_listener():
         _listener.stop()
 
 
-class ShmLogger:
+class Logger:
     INFO    = 20
     WARNING = 30
     ERROR   = 40
@@ -72,4 +72,4 @@ class ShmLogger:
     def warning(self, msg: str): self._write(self.WARNING, msg)
     def error(self, msg: str):   self._write(self.ERROR,   msg)
 
-log = ShmLogger()
+log = Logger()

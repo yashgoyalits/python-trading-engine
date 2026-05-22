@@ -2,7 +2,7 @@ import asyncio
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.infrastructure.shm_symbols import SymbolRegistry
-from src.trade_store import ITradeStore
+from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.entry_detection import EntryDetectionLoop
 from src.strategies.strategy_one.order_monitor import OrderMonitor
@@ -14,7 +14,7 @@ class StrategyHandler:
         self,
         shm: ShmStore,
         symbols: SymbolRegistry,
-        trades: ITradeStore,
+        trades: IActiveTradeManager,
         executor: BaseExecutor,
         strategy_id: str,
         sym_name: str,

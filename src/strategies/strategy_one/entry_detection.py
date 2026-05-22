@@ -3,16 +3,16 @@ from typing import Callable
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_CANDLE_HISTORY
-from src.trade_store import ITradeStore
+from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
-from src.strategies.strategy_one.logic import StrategyLogicManager
+from src.strategies.strategy_one.logic import EntryLogic
 
 class EntryDetectionLoop:
     def __init__(
         self,
         shm: ShmStore,
         sym_idx: int,
-        trades: ITradeStore,
+        trades: IActiveTradeManager,
         executor: BaseExecutor,
         strategy_id: str,
         on_trade_placed: Callable[[str], None],
@@ -23,7 +23,7 @@ class EntryDetectionLoop:
         self._trades   = trades
         self._executor = executor
         self._sid      = strategy_id
-        self._logic    = StrategyLogicManager()
+        self._logic    = EntryLogic()
 
         self._on_trade_placed = on_trade_placed
         self._is_max_reached  = is_max_reached

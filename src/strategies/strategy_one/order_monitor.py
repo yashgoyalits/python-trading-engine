@@ -3,14 +3,14 @@ from src.logger import log
 from src.db import csv
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
-from src.trade_store import ITradeStore
+from src.trade_manager import IActiveTradeManager
 
 
 class OrderMonitor:
     def __init__(
         self,
         shm: ShmStore,
-        trades: ITradeStore,
+        trades: IActiveTradeManager,
         trailing_event: asyncio.Event,
         strategy_id: str,
     ):

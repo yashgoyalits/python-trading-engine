@@ -8,7 +8,7 @@ from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
 from src.managers.candle_builder import CandleBuilder
-from src.trade_store import TradeRegistry
+from src.trade_manager import TradeRegistry
 from src.strategies.strategy_one.handler import StrategyHandler
 
 
