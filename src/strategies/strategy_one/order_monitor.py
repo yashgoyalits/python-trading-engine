@@ -1,3 +1,4 @@
+# src/strategies/strategy_one/order_monitor.py
 import asyncio
 from src.logger import log
 from src.db import csv
@@ -12,12 +13,16 @@ class OrderMonitor:
         shm: ShmStore,
         trades: IActiveTradeManager,
         trailing_event: asyncio.Event,
+        trade_closed_event: asyncio.Event,
         strategy_id: str,
+        trailing_cfg: list[dict],
     ):
-        self._shm            = shm
-        self._trades         = trades
-        self._trailing_event = trailing_event
-        self._sid            = strategy_id
+        self._shm                = shm
+        self._trades             = trades
+        self._trailing_event     = trailing_event
+        self._trade_closed_event = trade_closed_event   # handler ko signal
+        self._sid                = strategy_id
+        self._trailing_cfg       = trailing_cfg
 
     # ── main loop ─────────────────────────────────────────────
 
@@ -99,15 +104,19 @@ class OrderMonitor:
                 log.info(f"[{self._sid}] Child filled | {order_id}")
                 csv.log_close(trade)
                 self._trades.close_trade(trade_id)
+                self._trade_closed_event.set()   # ← handler ko signal — trade done
 
             if status == 1:
                 log.info(f"[{self._sid}] Child cancelled | {order_id}")
 
-    # ── trailing calc ─────────────────────────────────────────
+    # ── trailing calc — config se ─────────────────────────────
 
     def _calc_trailing(self, entry: float) -> list[dict]:
         return [
-            {"threshold": entry + 1.0, "new_stop": entry + 0.5,  "hit": False},
-            {"threshold": entry + 2.0, "new_stop": entry + 1.0,  "hit": False},
-            {"threshold": entry + 3.0, "new_stop": entry + 2.0,  "hit": False},
+            {
+                "threshold": entry + lvl['threshold_offset'],
+                "new_stop":  entry + lvl['new_stop_offset'],
+                "hit":       False,
+            }
+            for lvl in self._trailing_cfg
         ]
