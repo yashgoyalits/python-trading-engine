@@ -1,12 +1,12 @@
+# src/managers/candle_builder.py
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import (
-    MAX_SYMBOLS, MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY,
+    MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY,
     TF_30S, TF_1M, TF_3M,
 )
-from src.infrastructure.shm_symbols import SymbolRegistry
+from src.infrastructure.symbol_manager import SymbolManager
 
-# Maps timeframe → ctrl field names + candle array
 _TF_META = {
     TF_30S: ('c30s_seq', 'c30s_widx', 'c30s_bucket', 'candles_30s'),
     TF_1M:  ('c1m_seq',  'c1m_widx',  'c1m_bucket',  'candles_1m'),
@@ -15,25 +15,23 @@ _TF_META = {
 
 
 class CandleBuilder:
-    def __init__(self, shm: ShmStore, symbols: SymbolRegistry,
-                 watched: dict[str, list[int]]):
-        """
-        watched: { "NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M], ... }
-        """
+    def __init__(self, shm: ShmStore, manager: SymbolManager):
         self._shm     = shm
-        self._symbols = symbols
+        self._manager = manager
 
-        # Convert to idx-based
-        self._watched: dict[int, list[int]] = {
-            symbols.idx(sym): tfs for sym, tfs in watched.items()
-        }
-
-    
     async def run(self):
-        last_widx: dict[int, int | None] = {sym_idx: None for sym_idx in self._watched}
+        # Per-symbol last read pointer — lazily populated as symbols arrive
+        last_widx: dict[int, int | None] = {}
 
         while True:
-            for sym_idx, timeframes in self._watched.items():
+            # Live snapshot — runtime add() calls automatically picked up
+            subscriptions = self._manager.subscriptions()
+
+            for sym_idx, timeframes in subscriptions.items():
+
+                if sym_idx not in last_widx:
+                    last_widx[sym_idx] = None
+
                 ctrl     = self._shm.ctrl[sym_idx]
                 cur_widx = int(ctrl['tick_widx'])
 
@@ -45,13 +43,14 @@ class CandleBuilder:
 
                 while read_idx != cur_widx:
                     slot = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + read_idx]
-                    # ── SEQLOCK ───────────────────────────
+
+                    # ── SEQLOCK ───────────────────────────────
                     while True:
                         s1 = int(ctrl['tick_seq'])
                         if s1 & 1:
                             await asyncio.sleep(0)
                             continue
-                        # ── DIRECT FIELD READ ──
+
                         ts  = float(slot['timestamp'])
                         ltp = float(slot['ltp'])
                         vol = int(slot['volume'])
@@ -61,7 +60,8 @@ class CandleBuilder:
                             break
 
                         await asyncio.sleep(0.001)
-                    # ─────────────────────────────────────────────
+                    # ──────────────────────────────────────────
+
                     for tf in timeframes:
                         self._process(sym_idx, tf, ts, ltp, vol)
 
@@ -71,10 +71,11 @@ class CandleBuilder:
 
             await asyncio.sleep(0.001)
 
+    # ── candle logic (unchanged) ───────────────────────────────
 
     def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
         seq_f, widx_f, bucket_f, arr_attr = _TF_META[tf]
-        ctrl   = self._shm.ctrl[sym_idx]
+        ctrl    = self._shm.ctrl[sym_idx]
         candles = getattr(self._shm, arr_attr)
         bucket  = int(ts // tf)
         base    = sym_idx * MAX_CANDLE_HISTORY
@@ -82,22 +83,18 @@ class CandleBuilder:
         last_b  = int(ctrl[bucket_f])
 
         if last_b == 0:
-            # First tick for this symbol+tf
             ctrl[bucket_f] = bucket
             self._open_candle(candles[base + widx], ts, ltp, vol)
             return
 
         if bucket != last_b:
-            # Close current candle
             candles[base + widx]['seq'] += 1
-            # Open next slot
             new_widx = (widx + 1) % MAX_CANDLE_HISTORY
             ctrl[bucket_f] = bucket
             ctrl[widx_f]   = new_widx
-            ctrl[seq_f]   += 1     # signal to strategy that new candle closed
+            ctrl[seq_f]   += 1
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
         else:
-            # Update current candle in-place (zero copy)
             c = candles[base + widx]
             if ltp > c['high']: c['high'] = ltp
             if ltp < c['low']:  c['low']  = ltp

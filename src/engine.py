@@ -3,7 +3,7 @@ import asyncio
 from src.logger import log, stop_log_listener
 from src.core.shm_store import ShmStore
 from src.core.dtypes import TF_30S, TF_1M, TF_3M
-from src.infrastructure.shm_symbols import SymbolRegistry
+from src.infrastructure.symbol_manager import SymbolManager
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
@@ -16,25 +16,33 @@ class Engine:
 
     # ── Phase 1: Init — sync, no IO ───────────────────────────
     def _init(self) -> None:
-        self._shm    = ShmStore(create=True)
-        self._syms   = SymbolRegistry()
+        self._shm     = ShmStore(create=True)
 
-        self._syms.register("NSE:NIFTY50-INDEX")
+        # ── SymbolManager pehle (broker ke bina) ──────────────
+        self._symbols = SymbolManager()
 
-        self._data_broker  = FyersDataBroker(self._shm, self._syms)
+        # ── Brokers — SymbolManager ref lo data_broker ke liye
+        self._data_broker  = FyersDataBroker(self._shm, self._symbols)
         self._order_broker = FyersOrderBroker(self._shm)
         self._executor     = LiveExecutor()
 
+        # ── Ab broker inject karo ─────────────────────────────
+        self._symbols.set_broker(self._data_broker)
+
+        # ── Symbols register karo — broker auto-subscribe karega _start() mein
+        # (set_broker ke baad add() call hoga toh subscribe bhi hoga)
+        self._symbols.add("NSE:NIFTY50-INDEX", [TF_30S, TF_1M, TF_3M])
+
+        # ── Registry + strategy ───────────────────────────────
         registry             = TradeRegistry(self._shm)
         active_trade_manager = registry.register("STRATEGY_ONE")
 
-        self._candles = CandleBuilder(
-            self._shm, self._syms,
-            watched={"NSE:NIFTY50-INDEX": [TF_30S, TF_1M, TF_3M]},
-        )
+        # ── CandleBuilder — sirf manager chahiye, watched dict nahi
+        self._candles = CandleBuilder(self._shm, self._symbols)
+
         self._strategy = StrategyHandler(
             shm=self._shm,
-            symbols=self._syms,
+            symbols=self._symbols,
             trades=active_trade_manager,
             executor=self._executor,
             strategy_id="STRATEGY_ONE",
@@ -56,10 +64,15 @@ class Engine:
 
         log.info(f"Executor ready: {self._executor.is_connected()}")
 
-        self._data_broker.subscribe(["NSE:NIFTY50-INDEX"])
+        # Broker connected hai — ab sab registered symbols subscribe karo
+        # (add() ne pehle set_broker ke baad subscribe kiya tha, but agar
+        #  broker tab connected nahi tha toh yahan explicit subscribe safe hai)
+        for sym in self._symbols.all_symbols():
+            self._data_broker.subscribe([sym])
+
         log.info("Engine: start done — all connections live")
 
-    # ── Phase 3: Run — strategy primary, candles subordinate ──
+    # ── Phase 3: Run ──────────────────────────────────────────
     async def _run(self) -> None:
         log.info("Engine: running")
 
@@ -71,25 +84,22 @@ class Engine:
         ]
 
         try:
-            # Block here — strategy returns only when max_trades exhausted
             await strategy_task
             log.info("Engine: strategy complete")
 
         except asyncio.CancelledError:
-            # External interrupt (e.g. KeyboardInterrupt → asyncio cancels main task)
             log.info("Engine: cancelled externally")
             strategy_task.cancel()
             await asyncio.gather(strategy_task, return_exceptions=True)
             raise
 
         finally:
-            # Support tasks are always torn down after strategy exits (any reason)
             for t in support_tasks:
                 t.cancel()
             await asyncio.gather(*support_tasks, return_exceptions=True)
             log.info("Engine: support tasks stopped")
 
-    # ── Phase 4: Stop — ordered teardown ──────────────────────
+    # ── Phase 4: Stop ─────────────────────────────────────────
     async def _stop(self) -> None:
         log.info("Engine: stopping")
         self._data_broker.disconnect()
@@ -97,7 +107,7 @@ class Engine:
         await self._executor.disconnect()
         self._shm.cleanup()
         log.info("Engine: stopped")
-        stop_log_listener()   # flush + join log thread — must be last
+        stop_log_listener()
 
     # ── Entrypoint ────────────────────────────────────────────
     async def run(self) -> None:

@@ -1,3 +1,5 @@
+# src/broker/fyers/data_broker.py
+# CHANGE: SymbolRegistry → SymbolManager (get() method same hai)
 import os
 import asyncio
 import threading
@@ -5,16 +7,15 @@ from dotenv import load_dotenv
 from src.logger import log
 from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
-from src.infrastructure.shm_symbols import SymbolRegistry
+from src.infrastructure.symbol_manager import SymbolManager
 from src.core.dtypes import *
 
 load_dotenv()
 
-
 class FyersDataBroker:
-    def __init__(self, shm: ShmStore, symbols: SymbolRegistry):
+    def __init__(self, shm: ShmStore, symbols: SymbolManager):
         self._shm     = shm
-        self._symbols = symbols
+        self._symbols = symbols          # get() method use hota hai — interface same
         self._token   = os.getenv("FYERS_ACCESS_TOKEN")
         self._socket  = None
         self._thread  = None
@@ -63,7 +64,7 @@ class FyersDataBroker:
             if msg.get("type") not in ("if", "sf"):
                 return
             sym = msg.get("symbol")
-            idx = self._symbols.get(sym)
+            idx = self._symbols.get(sym)   # SymbolManager.get() — same as before
             if idx is None:
                 return
             self._write_tick(idx, msg)
@@ -87,8 +88,7 @@ class FyersDataBroker:
         widx = int(ctrl['tick_widx'])
         slot = self._shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + widx]
 
-        # ── SEQLOCK WRITER START ──────────────────────────────
-        ctrl['tick_seq'] += 1          # odd → "busy"
+        ctrl['tick_seq'] += 1
         slot['timestamp']  = msg.get("exch_feed_time", 0)
         slot['ltp']        = msg.get("ltp", 0.0)
         slot['volume']     = msg.get("volume", 0)
@@ -96,6 +96,5 @@ class FyersDataBroker:
         slot['high_price'] = msg.get("high_price", 0.0)
         slot['low_price']  = msg.get("low_price", 0.0)
         slot['prev_close'] = msg.get("prev_close_price", 0.0)
-        # ── SEQLOCK WRITER END ───────────────────────────────
-        ctrl['tick_seq'] += 1          # even → "ready"
+        ctrl['tick_seq'] += 1
         ctrl['tick_widx'] = (widx + 1) % MAX_TICKS_PER_SYMBOL
