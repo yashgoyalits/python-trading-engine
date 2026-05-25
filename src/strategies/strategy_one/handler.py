@@ -81,6 +81,9 @@ class StrategyHandler:
                 strike_price = atm_strike_price(close_price, side)
                 log.info(f"[{self._sid}] ATM Symbol: {strike_price}")
 
+                # Subscribe Strike Price ───────────────────────────────────────
+                dummy_idx = self._symbols.add(strike_price)
+
                 # Order Placement  ───────────────────────────────────────
                 res = await self._executor.place_order(
                     symbol="NSE:IDEA-EQ",
@@ -99,10 +102,8 @@ class StrategyHandler:
                 self._done  += 1
                 self._trades.add_trade(self._done, order_id)
                 log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
-
-                # Subscribe Strike Price ───────────────────────────────────────
-                dummy_idx = self._symbols.add(strike_price)
-
+                
+                # Trailing Task ───────────────────────────────────────
                 trailing_task = asyncio.create_task(
                     self._trailing.run(dummy_idx, self._shm, self._trailing_event),
                     name=f"{self._sid}_trailing",
