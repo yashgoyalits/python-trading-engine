@@ -8,6 +8,7 @@ from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.entry_detection import EntryDetectionLoop
 from src.strategies.strategy_one.order_monitor import OrderMonitor
 from src.strategies.strategy_one.trailing import TrailingManager
+from src.strategies.strategy_one.strike_price_helper import atm_strike_price
 
 class StrategyHandler:
     def __init__(
@@ -73,9 +74,14 @@ class StrategyHandler:
             while self._done < self._max:
 
                 # ── Entry Detection Lopp ────────────────────────
-                side = await self._entry_detection_loop.run()
-                log.info(f"[{self._sid}] Signal: side={side}")
+                side, close_price = await self._entry_detection_loop.run()
+                log.info(f"[{self._sid}] Signal: side={side}, {close_price}")
 
+                # Strike price selection  ────────────────────────
+                strike_price = atm_strike_price(close_price, side)
+                log.info(f"[{self._sid}] ATM Symbol: {strike_price}")
+
+                # Order Placement  ────────────────────────
                 res = await self._executor.place_order(
                     symbol="NSE:IDEA-EQ",
                     qty=self._qty,

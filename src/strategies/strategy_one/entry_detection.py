@@ -46,5 +46,6 @@ class EntryDetectionLoop:
 
             side = self._logic.check_entry(candle)
             if side is not None:
+                log.info(candle)
                 log.info(f"[{self._sid}] Entry signal | side={side}")
-                return side
+                return side, candle['close']
