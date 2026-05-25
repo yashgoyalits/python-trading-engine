@@ -24,6 +24,7 @@ class StrategyHandler:
         self._sid      = config['id']
         self._max      = config['max_trades']
         self._done     = 0
+        self._symbols = symbols
 
         sym_name      = config['symbols'][0]   # baad mein dynamic
         self._sym_idx = symbols.idx(sym_name)
@@ -41,7 +42,7 @@ class StrategyHandler:
         self._trailing_event     = asyncio.Event()
 
         # Sub-components — sirf zaroorat ki cheezein pass karo
-        self._entry_loop = EntryDetectionLoop(
+        self._entry_detection_loop = EntryDetectionLoop(
             shm=shm,
             sym_idx=self._sym_idx,
             strategy_id=self._sid,
@@ -62,55 +63,57 @@ class StrategyHandler:
     async def run(self):
         log.info(f"[{self._sid}] Starting — max trades: {self._max}")
 
-        while self._done < self._max:
+        # ── Monitor ek baar start karo — hamesha chalta rahega ──
+        monitor_task = asyncio.create_task(
+            self._order_monitor.run(),          
+            name=f"{self._sid}_monitor",
+        )
 
-            # ── 1. Entry signal wait karo ─────────────────────
-            side = await self._entry_loop.run()
-            log.info(f"[{self._sid}] Signal: side={side}")
+        try:
+            while self._done < self._max:
 
-            # ───── dynamic strike price calcualtion later ───── 
-            ### retun the symbol in which i want to take the trade
+                # ── Entry Detection Lopp ────────────────────────
+                side = await self._entry_detection_loop.run()
+                log.info(f"[{self._sid}] Signal: side={side}")
 
-            # ── 2. Handler place karta hai ────────────────────
-            res = await self._executor.place_order(
-                symbol="NSE:IDEA-EQ",
-                qty=self._qty,
-                order_type=self._order_type,
-                side=side,
-                stop_loss=self._stop_loss,
-                take_profit=self._take_profit,
-            )
+                res = await self._executor.place_order(
+                    symbol="NSE:IDEA-EQ",
+                    qty=self._qty,
+                    order_type=self._order_type,
+                    side=side,
+                    stop_loss=self._stop_loss,
+                    take_profit=self._take_profit,
+                )
 
-            if res.get('code') != 1101:
-                log.error(f"[{self._sid}] Order failed: {res}")
-                continue   # dobara signal dhundho
+                if res.get('code') != 1101:
+                    log.error(f"[{self._sid}] Order failed: {res}")
+                    continue
 
-            order_id    = res.get('id', '')
-            self._done += 1
-            self._trades.add_trade(self._done, order_id)
-            log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
+                order_id     = res.get('id', '')
+                self._done  += 1
+                self._trades.add_trade(self._done, order_id)
+                log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
 
-            # ── 3. Monitor + trailing start karo ─────────────
-            monitor_task = asyncio.create_task(
-                self._order_monitor.run(),
-                name=f"{self._sid}_monitor",
-            )
-            trailing_task = asyncio.create_task(
-                self._trailing.run(self._sym_idx, self._shm, self._trailing_event),
-                name=f"{self._sid}_trailing",
-            )
+                dummy_idx = self._symbols.add("NSE:NIFTY26MAY24000CE")
 
-            # ── 4. Trade close hone tak block karo ───────────
-            await self._trade_closed_event.wait()
+                trailing_task = asyncio.create_task(
+                    self._trailing.run(dummy_idx, self._shm, self._trailing_event),
+                    name=f"{self._sid}_trailing",
+                )
 
-            # ── 5. Reset + tasks band karo ────────────────────
-            self._trade_closed_event.clear()
-            self._trailing_event.clear()
+                await self._trade_closed_event.wait()
 
+                self._trade_closed_event.clear()
+                self._trailing_event.clear()
+                self._symbols.remove("NSE:NIFTY26MAY24000CE")
+
+                trailing_task.cancel()
+                await asyncio.gather(trailing_task, return_exceptions=True)
+
+                log.info(f"[{self._sid}] Trade #{self._done} closed")
+
+        finally:
             monitor_task.cancel()
-            trailing_task.cancel()
-            await asyncio.gather(monitor_task, trailing_task, return_exceptions=True)
-
-            log.info(f"[{self._sid}] Trade #{self._done} closed")
+            await asyncio.gather(monitor_task, return_exceptions=True)
 
         log.info(f"[{self._sid}] Max trades reached. Done.")
