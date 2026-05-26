@@ -1,5 +1,5 @@
 import os
-import aiohttp
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,41 +11,32 @@ class FyersOrderPlacement:
     def __init__(self):
         self._client_id    = os.getenv("CLIENT_ID")
         self._access_token = os.getenv("FYERS_ACCESS_TOKEN")
-        self._session: aiohttp.ClientSession | None = None
+        self._client: httpx.AsyncClient | None = None
+        self._connected = False
 
     async def connect(self) -> None:
-        """Engine start pe call karo — data/order broker ke saath."""
-        connector = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300, ssl=True)
-        self._session = aiohttp.ClientSession(
+        self._client = httpx.AsyncClient(
             base_url=_BASE,
-            connector=connector,
+            http2=True,
             headers={"Authorization": f"{self._client_id}:{self._access_token}"},
+            timeout=httpx.Timeout(5.0)
         )
         try:
-            async with self._session.get("/api/v3/profile") as r:
-                await r.read()
+            await self._client.get("/api/v3/profile")
         except Exception:
-            pass  # session ready hai, warmup fail ho toh bhi chalega
+            pass
+        self._connected = True
 
     def is_connected(self) -> bool:
-        return self._session is not None and not self._session.closed
+        return self._connected
 
     async def disconnect(self) -> None:
-        if self._session:
-            await self._session.close()
-            self._session = None
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+        self._connected = False
 
-    # ── public ────────────────────────────────────────────────
-
-    async def place_order(
-        self,
-        symbol: str,
-        qty: int,
-        order_type: int,
-        side: int,
-        stop_loss: float,
-        take_profit: float,
-    ) -> dict:
+    async def place_order(self, symbol, qty, order_type, side, stop_loss, take_profit) -> dict:
         return await self._post("/api/v3/orders/sync", {
             "symbol":       symbol,
             "qty":          qty,
@@ -59,14 +50,7 @@ class FyersOrderPlacement:
             "takeProfit":   take_profit,
         })
 
-    async def modify_order(
-        self,
-        order_id: str,
-        order_type: int,
-        limit_price: float,
-        stop_price: float,
-        qty: int,
-    ) -> dict:
+    async def modify_order(self, order_id, order_type, limit_price, stop_price, qty) -> dict:
         return await self._patch("/api/v3/orders/sync", {
             "id":         order_id,
             "type":       order_type,
@@ -75,12 +59,10 @@ class FyersOrderPlacement:
             "qty":        qty,
         })
 
-    # ── internal ──────────────────────────────────────────────
-
     async def _post(self, path: str, payload: dict) -> dict:
-        async with self._session.post(path, json=payload) as r:
-            return await r.json()
+        r = await self._client.post(path, json=payload)
+        return r.json()
 
     async def _patch(self, path: str, payload: dict) -> dict:
-        async with self._session.patch(path, json=payload) as r:
-            return await r.json()
+        r = await self._client.patch(path, json=payload)
+        return r.json()
