@@ -12,14 +12,24 @@ class SymbolManager:
 
     Broker ke saath circular dependency se bachne ke liye
     set_broker() alag se call karo (engine._init() mein).
+
+    tf_map: shm.tf_map ke saath consistent — same object ya copy.
+    Consumers (CandleBuilder, EntryDetectionLoop) shm.tf_map directly
+    use karte hain — SymbolManager se expose karna optional convenience hai.
     """
 
-    def __init__(self, timeframes: list[int]):  # ← yahan le lo
-        self._map = {}
-        self._tfs: dict[int, list[int]] = {}
-        self._tfs_default = timeframes          # ← store kar lo
-        self._next_idx = 0
-        self._broker = None                  # set_broker() se milega
+    def __init__(self, timeframes: list[int]):
+        self._map          = {}
+        self._tfs:         dict[int, list[int]] = {}
+        self._tfs_default  = timeframes
+        self._next_idx     = 0
+        self._broker       = None
+
+        # tf_value → sub-array slot index — same mapping as shm.tf_map
+        # Exposed so callers don't need shm reference for this
+        self.tf_map: dict[int, int] = {
+            tf: idx for idx, tf in enumerate(timeframes)
+        }
 
     # ── broker wire ───────────────────────────────────────────
 

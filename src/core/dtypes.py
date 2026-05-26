@@ -6,6 +6,7 @@ MAX_CANDLE_HISTORY   = 500
 MAX_ACTIVE_TRADES    = 10
 MAX_TRAILING         = 5
 MAX_ORDERS           = 200
+MAX_TF               = 8        # max supported timeframes
 
 TICK_DTYPE = np.dtype([
     ('seq',        np.uint64),
@@ -28,32 +29,19 @@ CANDLE_DTYPE = np.dtype([
     ('start_time', np.float64),
 ])
 
-
-def make_ctrl_dtype(timeframes: list[int]) -> np.dtype:
-    """
-    Config ke timeframes se CTRL_DTYPE dynamically banao.
-    Tick fields hamesha rahenge, candle fields TF list se generate honge.
-
-    e.g. timeframes=[30, 60, 180] =>
-        tick_seq, tick_widx,
-        c30_seq, c30_widx, c30_bucket,
-        c60_seq, c60_widx, c60_bucket,
-        c180_seq, c180_widx, c180_bucket,
-        _pad
-    """
-    fields = [
-        ('tick_seq',  np.uint64),
-        ('tick_widx', np.uint32),
-    ]
-    for tf in timeframes:
-        fields += [
-            (f'c{tf}_seq',    np.uint64),
-            (f'c{tf}_widx',   np.uint32),
-            (f'c{tf}_bucket', np.int64),
-        ]
-    fields.append(('_pad', np.uint8, (4,)))
-    return np.dtype(fields)
-
+# Fixed layout — MAX_TF slots, integer indexed.
+# tf_map (built at startup) provides: tf_value → slot_index
+# Hot path: ctrl['tf_widx'][tf_idx]  — integer index, direct byte offset
+# No string formatting, no runtime dtype field resolution.
+CTRL_DTYPE = np.dtype([
+    ('tick_seq',  np.uint64),
+    ('tick_widx', np.uint32),
+    ('_pad0',     np.uint8, (4,)),          # align tf_seq to 8-byte boundary
+    ('tf_seq',    np.uint64, (MAX_TF,)),    # candle sequence counter per TF
+    ('tf_widx',   np.uint32, (MAX_TF,)),    # candle write index per TF
+    ('_pad1',     np.uint8, (4,)),          # align tf_bucket to 8-byte boundary
+    ('tf_bucket', np.int64,  (MAX_TF,)),    # current bucket (ts // tf) per TF
+])
 
 ORDER_DTYPE = np.dtype([
     ('seq',            np.uint64),

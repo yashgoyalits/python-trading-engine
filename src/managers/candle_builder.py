@@ -9,6 +9,9 @@ class CandleBuilder:
     def __init__(self, shm: ShmStore, manager: SymbolManager):
         self._shm     = shm
         self._manager = manager
+        # Precompute once — used in _process() hot path
+        # tf_value → sub-array slot index, e.g. {30: 0, 60: 1, 180: 2}
+        self._tf_map: dict[int, int] = shm.tf_map
 
     async def run(self):
         last_widx: dict[int, int | None] = {}
@@ -61,25 +64,27 @@ class CandleBuilder:
             await asyncio.sleep(0.001)
 
     def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
-        # ctrl[sym_idx] mein hi sab hai — pehle jaisa ek hi array
         ctrl    = self._shm.ctrl[sym_idx]
         candles = self._shm.candles[tf]
         bucket  = int(ts // tf)
         base    = sym_idx * MAX_CANDLE_HISTORY
-        widx    = int(ctrl[f'c{tf}_widx'])
-        last_b  = int(ctrl[f'c{tf}_bucket'])
+
+        # Integer index — direct byte offset, no string hash lookup
+        tf_idx = self._tf_map[tf]
+        widx   = int(ctrl['tf_widx'][tf_idx])
+        last_b = int(ctrl['tf_bucket'][tf_idx])
 
         if last_b == 0:
-            ctrl[f'c{tf}_bucket'] = bucket
+            ctrl['tf_bucket'][tf_idx] = bucket
             self._open_candle(candles[base + widx], ts, ltp, vol)
             return
 
         if bucket != last_b:
-            candles[base + widx]['seq'] += 1
-            new_widx              = (widx + 1) % MAX_CANDLE_HISTORY
-            ctrl[f'c{tf}_bucket'] = bucket
-            ctrl[f'c{tf}_widx']   = new_widx
-            ctrl[f'c{tf}_seq']   += 1
+            candles[base + widx]['seq'] += 1          # close current candle
+            new_widx                    = (widx + 1) % MAX_CANDLE_HISTORY
+            ctrl['tf_bucket'][tf_idx]   = bucket
+            ctrl['tf_widx'][tf_idx]     = new_widx
+            ctrl['tf_seq'][tf_idx]     += 1           # signal entry detection
             self._open_candle(candles[base + new_widx], ts, ltp, vol)
         else:
             c = candles[base + widx]
