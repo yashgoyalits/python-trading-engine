@@ -1,6 +1,7 @@
 # src/strategies/strategy_one/handler.py
 import asyncio
 from src.logger import log
+from src.db import csv
 from src.core.shm_store import ShmStore
 from src.infrastructure.symbol_manager import SymbolManager
 from src.trade_manager import IActiveTradeManager
@@ -110,6 +111,11 @@ class StrategyHandler:
                 )
 
                 await self._trade_closed_event.wait()
+
+                # Log Trade After Closed ───────────────────────────────────────
+                trade = self._trades.get_active()
+                csv.log_close(trade)
+                self._trades.close_trade(trade_id)
 
                 self._trade_closed_event.clear()
                 self._trailing_event.clear()

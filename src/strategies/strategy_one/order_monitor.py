@@ -1,7 +1,6 @@
 # src/strategies/strategy_one/order_monitor.py
 import asyncio
 from src.logger import log
-from src.db import csv
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
 from src.trade_manager import IActiveTradeManager
@@ -102,8 +101,6 @@ class OrderMonitor:
 
             if status == 2:
                 log.info(f"[{self._sid}] Child filled | {order_id}")
-                csv.log_close(trade)
-                self._trades.close_trade(trade_id)
                 self._trade_closed_event.set()   # ← handler ko signal — trade done
 
             if status == 1:
