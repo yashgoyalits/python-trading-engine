@@ -28,12 +28,12 @@ class StrategyHandler:
         self._done     = 0
         self._symbols = symbols
 
-        sym_name = config['entry_symbol']   # baad mein dynamic
+        # Entry Symbol from Config
+        sym_name = config['entry_symbol']
         self._sym_idx = symbols.idx(sym_name)
 
-        # Order params — handler place karega
+        # Order params from Config
         ocfg              = config['order']
-        self._sym         = sym_name           # baad mein strike dynamic hoga
         self._qty         = ocfg['qty']
         self._order_type  = ocfg['order_type']
         self._stop_loss   = ocfg['stop_loss']
