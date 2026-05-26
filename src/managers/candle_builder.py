@@ -1,4 +1,5 @@
 # src/managers/candle_builder.py
+import time
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY
@@ -9,11 +10,30 @@ class CandleBuilder:
     def __init__(self, shm: ShmStore, manager: SymbolManager):
         self._shm     = shm
         self._manager = manager
-        # Precompute once — used in _process() hot path
         # tf_value → sub-array slot index, e.g. {30: 0, 60: 1, 180: 2}
         self._tf_map: dict[int, int] = shm.tf_map
 
+    # ── entrypoint ────────────────────────────────────────────
+
     async def run(self):
+        # Har tf ke liye ek timer task
+        timer_tasks = [
+            asyncio.create_task(
+                self._run_timer(tf), name=f"candle_timer_{tf}"
+            )
+            for tf in self._tf_map
+        ]
+
+        try:
+            await self._tick_loop()
+        finally:
+            for t in timer_tasks:
+                t.cancel()
+            await asyncio.gather(*timer_tasks, return_exceptions=True)
+
+    # ── tick loop — sirf OHLCV update ────────────────────────
+
+    async def _tick_loop(self):
         last_widx: dict[int, int | None] = {}
 
         while True:
@@ -55,7 +75,7 @@ class CandleBuilder:
                     # ──────────────────────────────────────────
 
                     for tf in timeframes:
-                        self._process(sym_idx, tf, ts, ltp, vol)
+                        self._update_candle(sym_idx, tf, ts, ltp, vol)
 
                     read_idx = (read_idx + 1) % MAX_TICKS_PER_SYMBOL
 
@@ -63,42 +83,77 @@ class CandleBuilder:
 
             await asyncio.sleep(0.001)
 
-    def _process(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
+    # ── timer task — exact boundary par candle close ─────────
+
+    async def _run_timer(self, tf: int):
+        while True:
+            # Wall clock se next boundary calculate karo
+            wall_now  = time.time()
+            next_wall = (int(wall_now) // tf + 1) * tf
+            sleep_for = next_wall - wall_now
+
+            await asyncio.sleep(sleep_for)
+
+            # Sab registered symbols ke liye candle close karo
+            for sym_idx in self._manager.subscriptions():
+                self._close_candle(sym_idx, tf, next_wall)
+
+    # ── candle close — timer se trigger hota hai ─────────────
+
+    def _close_candle(self, sym_idx: int, tf: int, boundary_ts: float):
         ctrl    = self._shm.ctrl[sym_idx]
         candles = self._shm.candles[tf]
-        bucket  = int(ts // tf)
+        tf_idx  = self._tf_map[tf]
         base    = sym_idx * MAX_CANDLE_HISTORY
 
-        # Integer index — direct byte offset, no string hash lookup
-        tf_idx = self._tf_map[tf]
-        widx   = int(ctrl['tf_widx'][tf_idx])
-        last_b = int(ctrl['tf_bucket'][tf_idx])
+        widx = int(ctrl['tf_widx'][tf_idx])
 
-        if last_b == 0:
-            ctrl['tf_bucket'][tf_idx] = bucket
-            self._open_candle(candles[base + widx], ts, ltp, vol)
+        # Agar candle kabhi open hi nahi hui (no ticks in this period)
+        # toh close karne ki zaroorat nahi
+        if candles[base + widx]['open'] == 0.0:
             return
 
-        if bucket != last_b:
-            candles[base + widx]['seq'] += 1          # close current candle
-            new_widx                    = (widx + 1) % MAX_CANDLE_HISTORY
-            ctrl['tf_bucket'][tf_idx]   = bucket
-            ctrl['tf_widx'][tf_idx]     = new_widx
-            ctrl['tf_seq'][tf_idx]     += 1           # signal entry detection
-            self._open_candle(candles[base + new_widx], ts, ltp, vol)
-        else:
-            c = candles[base + widx]
-            if ltp > c['high']: c['high'] = ltp
-            if ltp < c['low']:  c['low']  = ltp
-            c['close']  = ltp
-            c['volume'] += vol
+        # Close current candle
+        candles[base + widx]['seq'] += 1
 
-    @staticmethod
-    def _open_candle(slot, ts: float, ltp: float, vol: int):
-        slot['open']       = ltp
-        slot['high']       = ltp
-        slot['low']        = ltp
-        slot['close']      = ltp
-        slot['volume']     = vol
-        slot['start_time'] = ts
+        # Next slot open karo
+        new_widx = (widx + 1) % MAX_CANDLE_HISTORY
+        ctrl['tf_widx'][tf_idx]  = new_widx
+        ctrl['tf_seq'][tf_idx]  += 1          # entry detection ko signal
+
+        # Next candle blank — pehla tick aayega tab open hoga
+        slot = candles[base + new_widx]
+        slot['open']       = 0.0
+        slot['high']       = 0.0
+        slot['low']        = 0.0
+        slot['close']      = 0.0
+        slot['volume']     = 0
+        slot['start_time'] = boundary_ts
         slot['seq']        = 0
+
+    # ── OHLCV update — tick se trigger hota hai ──────────────
+
+    def _update_candle(self, sym_idx: int, tf: int, ts: float, ltp: float, vol: int):
+        ctrl    = self._shm.ctrl[sym_idx]
+        candles = self._shm.candles[tf]
+        tf_idx  = self._tf_map[tf]
+        base    = sym_idx * MAX_CANDLE_HISTORY
+
+        widx = int(ctrl['tf_widx'][tf_idx])
+        c    = candles[base + widx]
+
+        # Pehla tick — candle open karo
+        if c['open'] == 0.0:
+            c['open']       = ltp
+            c['high']       = ltp
+            c['low']        = ltp
+            c['close']      = ltp
+            c['volume']     = vol
+            c['start_time'] = ts
+            return
+
+        # Baad ke ticks — sirf update karo
+        if ltp > c['high']: c['high'] = ltp
+        if ltp < c['low']:  c['low']  = ltp
+        c['close']  = ltp
+        c['volume'] += vol
