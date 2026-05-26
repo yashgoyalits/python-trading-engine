@@ -28,7 +28,7 @@ class StrategyHandler:
         self._done     = 0
         self._symbols = symbols
 
-        sym_name      = config['symbols'][0]   # baad mein dynamic
+        sym_name = config['entry_symbol']   # baad mein dynamic
         self._sym_idx = symbols.idx(sym_name)
 
         # Order params — handler place karega

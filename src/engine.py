@@ -29,9 +29,8 @@ class Engine:
         self._symbols.set_broker(self._data_broker)
 
         for scfg in cfg['strategies']:
-            for sym in scfg['symbols']:
-                self._symbols.add(sym)
-
+            self._symbols.add(scfg['entry_symbol'])
+            
         registry = TradeRegistry(self._shm)
 
         self._candles = CandleBuilder(self._shm, self._symbols)

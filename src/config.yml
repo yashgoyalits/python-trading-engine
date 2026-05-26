@@ -9,7 +9,9 @@ timeframes: [30, 60, 180]
 
 strategies:
   - id: STRATEGY_ONE
-    symbols: ["NSE:NIFTY50-INDEX"]
+    name: "Strategy One"
+    description: "Nifty index entry on candle body signal"
+    entry_symbol: "NSE:NIFTY50-INDEX"
     max_trades: 1
     entry_tf: 30
 
