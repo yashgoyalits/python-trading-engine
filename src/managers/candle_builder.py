@@ -3,7 +3,7 @@ import time
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY
-from src.infrastructure.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_manager import SymbolManager
 
 
 class CandleBuilder:

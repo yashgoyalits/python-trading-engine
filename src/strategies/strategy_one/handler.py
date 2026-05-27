@@ -3,7 +3,7 @@ import asyncio
 from src.logger import log
 from src.db import csv
 from src.core.shm_store import ShmStore
-from src.infrastructure.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_manager import SymbolManager
 from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.entry_detection import EntryDetectionLoop

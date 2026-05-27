@@ -3,7 +3,7 @@ import asyncio
 from src.config import load
 from src.logger import log, stop_log_listener
 from src.core.shm_store import ShmStore
-from src.infrastructure.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_manager import SymbolManager
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
