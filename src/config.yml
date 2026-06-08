@@ -4,8 +4,8 @@ engine:
   log_file: trading.log
   trade_csv: trades.csv
 
-# Sab strategies ke liye common timeframes
-timeframes: [30, 60, 180]
+# Sab strategies ke liye common timeframes seconds mein
+timeframes: [30, 60, 180, 300, 1500]
 
 strategies:
   - id: STRATEGY_ONE
