@@ -1,55 +1,36 @@
-# src/infrastructure/symbol_manager.py
+# src/symbol_manager/symbol_manager.py
 from __future__ import annotations
 from src.core.dtypes import MAX_SYMBOLS
 
 
 class SymbolManager:
-    """
-    Ek jagah sab kuch:
-      - symbol → idx mapping
-      - idx → timeframes mapping
-      - broker subscribe / unsubscribe
-
-    Broker ke saath circular dependency se bachne ke liye
-    set_broker() alag se call karo (engine._init() mein).
-
-    tf_map: shm.tf_map ke saath consistent — same object ya copy.
-    Consumers (CandleBuilder, EntryDetectionLoop) shm.tf_map directly
-    use karte hain — SymbolManager se expose karna optional convenience hai.
-    """
 
     def __init__(self, timeframes: list[int]):
-        self._map          = {}
+        self._map:         dict[str, int]      = {}
         self._tfs:         dict[int, list[int]] = {}
-        self._tfs_default  = timeframes
-        self._next_idx     = 0
-        self._broker       = None
+        self._tfs_default: list[int]           = timeframes
+        self._next_idx:    int                 = 0
+        self._free:        list[int]           = []  # freed slots pool
+        self._broker                           = None
 
-        # tf_value → sub-array slot index — same mapping as shm.tf_map
-        # Exposed so callers don't need shm reference for this
+        # tf_value → ctrl sub-array slot index, same as shm.tf_map
         self.tf_map: dict[int, int] = {
             tf: idx for idx, tf in enumerate(timeframes)
         }
 
-    # ── broker wire ───────────────────────────────────────────
-
     def set_broker(self, broker) -> None:
-        """DataBroker ref inject karo after both are constructed."""
         self._broker = broker
 
-    # ── public API ────────────────────────────────────────────
-
     def add(self, symbol: str) -> int:
-        """
-        Symbol register karo + broker ko subscribe karo.
-        Agar symbol pehle se hai toh sirf timeframes update hote hain.
-        Returns: shm idx
-        """
-        assert self._next_idx < MAX_SYMBOLS, "MAX_SYMBOLS limit hit"
-
         if symbol not in self._map:
-            self._map[symbol] = self._next_idx
-            self._next_idx += 1
+            # reuse freed slot, else allocate new
+            if self._free:
+                idx = self._free.pop()
+            else:
+                assert self._next_idx < MAX_SYMBOLS, "MAX_SYMBOLS limit hit"
+                idx = self._next_idx
+                self._next_idx += 1
+            self._map[symbol] = idx
 
         idx = self._map[symbol]
         self._tfs[idx] = self._tfs_default
@@ -60,32 +41,26 @@ class SymbolManager:
         return idx
 
     def remove(self, symbol: str) -> None:
-        """
-        Symbol unsubscribe karo + mapping hata do.
-        Note: shm slot reuse nahi hota (simple design).
-        """
         idx = self._map.pop(symbol, None)
         if idx is None:
             return
 
         self._tfs.pop(idx, None)
+        self._free.append(idx)  # return slot to pool
 
         if self._broker is not None:
             self._broker.unsubscribe([symbol])
 
     def idx(self, symbol: str) -> int:
-        """Strict lookup — KeyError if not registered."""
+        # strict — KeyError if not registered
         return self._map[symbol]
 
     def get(self, symbol: str) -> int | None:
-        """Broker ke _on_message ke liye — None return karo if missing."""
+        # safe — None if missing (used by data_broker._on_message)
         return self._map.get(symbol)
 
     def subscriptions(self) -> dict[int, list[int]]:
-        """
-        CandleBuilder.run() loop mein use karo.
-        Returns live snapshot: { idx: [tf, ...], ... }
-        """
+        # live snapshot: {sym_idx: [tf, ...]}
         return dict(self._tfs)
 
     def all_symbols(self) -> dict[str, int]:
