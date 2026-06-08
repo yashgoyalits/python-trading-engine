@@ -1,1 +1,1 @@
-from src.db._core import TradeCSVLogger, csv
+from src.db.trade_logger import TradeCSVLogger, csv
