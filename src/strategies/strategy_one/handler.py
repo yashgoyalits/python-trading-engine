@@ -78,7 +78,7 @@ class StrategyHandler:
                 side, close_price = await self._entry_detection_loop.run()
                 log.info(f"[{self._sid}] Signal: side={side}, {close_price}")
 
-                # Strike price selection  ────────────────────────
+                # Strike price calculation  ────────────────────────
                 strike_price = atm_strike_price(close_price, side)
                 log.info(f"[{self._sid}] ATM Symbol: {strike_price}")
 
