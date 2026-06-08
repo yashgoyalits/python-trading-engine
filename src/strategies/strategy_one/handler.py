@@ -114,13 +114,16 @@ class StrategyHandler:
 
                 # Log Trade After Closed ───────────────────────────────────────
                 trade = self._trades.get_active()
+                trade_id = trade['order_id'].tobytes().rstrip(b'\x00').decode()
                 csv.log_close(trade)
                 self._trades.close_trade(trade_id)
 
+                # Clear Events ───────────────────────────────────────
                 self._trade_closed_event.clear()
                 self._trailing_event.clear()
                 self._symbols.remove(strike_price)
 
+                # Cancel Trailing Task ───────────────────────────────────────
                 trailing_task.cancel()
                 await asyncio.gather(trailing_task, return_exceptions=True)
 
