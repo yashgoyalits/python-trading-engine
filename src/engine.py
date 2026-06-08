@@ -8,6 +8,7 @@ from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
 from src.managers.candle_builder import CandleBuilder
+from src.managers.atm_tracker import ATMTracker
 from src.trade_manager import TradeRegistry
 from src.strategies.strategy_one.handler import StrategyHandler
 
@@ -44,6 +45,12 @@ class Engine:
             config=scfg,
         )
 
+        self._atm_tracker = ATMTracker(
+            shm     = self._shm,
+            symbols = self._symbols,
+            sym_idx = self._symbols.idx("NSE:NIFTY50-INDEX"),
+        )
+
         log.info("Engine: init done")
 
     # ── Phase 2: Start ────────────────────────────────────────
@@ -72,7 +79,8 @@ class Engine:
             self._strategy.run(), name="strategy"
         )
         support_tasks = [
-            asyncio.create_task(self._candles.run(), name="candles"),
+            asyncio.create_task(self._candles.run(),     name="candles"),
+            asyncio.create_task(self._atm_tracker.run(), name="atm_tracker"),  
         ]
 
         try:

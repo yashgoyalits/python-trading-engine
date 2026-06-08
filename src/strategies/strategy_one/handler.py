@@ -102,7 +102,7 @@ class StrategyHandler:
                 log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
 
                 # Subscribe Strike Price ───────────────────────────────────────
-                dummy_idx = self._symbols.add(strike_price)
+                dummy_idx = self._symbols.sym_already_sub_or_not(strike_price)
                 
                 # Trailing Task ───────────────────────────────────────
                 trailing_task = asyncio.create_task(
@@ -121,7 +121,6 @@ class StrategyHandler:
                 # Clear Events ───────────────────────────────────────
                 self._trade_closed_event.clear()
                 self._trailing_event.clear()
-                self._symbols.remove(strike_price)
 
                 # Cancel Trailing Task ───────────────────────────────────────
                 trailing_task.cancel()

@@ -51,6 +51,11 @@ class SymbolManager:
         if self._broker is not None:
             self._broker.unsubscribe([symbol])
 
+    def sym_already_sub_or_not(self, symbol: str) -> int:
+        if symbol in self._map:
+            return self._map[symbol]
+        return self.add(symbol)
+
     def idx(self, symbol: str) -> int:
         # strict — KeyError if not registered
         return self._map[symbol]
