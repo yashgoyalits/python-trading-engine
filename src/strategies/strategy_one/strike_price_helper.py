@@ -22,5 +22,5 @@ def atm_strike_price(price: float, side: int) -> str:
     expiry = _current_week_expiry(today)
     strike = round(price / _INTERVAL) * _INTERVAL
     opt    = "CE" if side == 1 else "PE"
-    exp    = expiry.strftime("%d%b").upper()   # 29MAY, 05JUN
+    exp = expiry.strftime("%y") + str(expiry.month) + expiry.strftime("%d")   # 260609
     return f"{_EXCHANGE}:{_UNDERLYING}{exp}{strike}{opt}"
