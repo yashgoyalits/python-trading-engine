@@ -19,13 +19,21 @@ class FyersOrderPlacement:
             base_url=_BASE,
             http2=True,
             headers={"Authorization": f"{self._client_id}:{self._access_token}"},
-            timeout=httpx.Timeout(5.0)
+            timeout=httpx.Timeout(5.0),
         )
         try:
-            await self._client.get("/api/v3/profile")
-        except Exception:
-            pass
-        self._connected = True
+            r = await self._client.get("/api/v3/profile")
+            r.raise_for_status()
+            data = r.json()
+            if data.get("s") != "ok":
+                raise RuntimeError(f"Fyers auth check failed: {data}")
+            self._connected = True
+        except Exception as e:
+            self._connected = False
+            await self._client.aclose()
+            self._client = None
+            log.error(f"FyersOrderPlacement.connect failed: {e}")
+            raise
 
     def is_connected(self) -> bool:
         return self._connected
