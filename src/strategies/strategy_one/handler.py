@@ -83,14 +83,18 @@ class StrategyHandler:
                 log.info(f"[{self._sid}] ATM Symbol: {strike_price}")
 
                 # Order Placement  ───────────────────────────────────────
-                res = await self._executor.place_order(
-                    symbol="NSE:IDEA-EQ",
-                    qty=self._qty,
-                    order_type=self._order_type,
-                    side=side,
-                    stop_loss=self._stop_loss,
-                    take_profit=self._take_profit,
-                )
+                try:
+                    res = await self._executor.place_order(
+                        symbol="NSE:IDEA-EQ",
+                        qty=self._qty,
+                        order_type=self._order_type,
+                        side=side,
+                        stop_loss=self._stop_loss,
+                        take_profit=self._take_profit,
+                    )
+                except Exception as e:
+                    log.error(f"[{self._sid}] place_order raised unexpectedly: {e}")
+                    continue
 
                 if res.get('code') != 1101:
                     log.error(f"[{self._sid}] Order failed: {res}")
@@ -102,11 +106,11 @@ class StrategyHandler:
                 log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
 
                 # Subscribe Strike Price ───────────────────────────────────────
-                dummy_idx = self._symbols.sym_already_sub_or_not(strike_price)
+                option_sym_idx = self._symbols.sym_already_sub_or_not(strike_price)
                 
                 # Trailing Task ───────────────────────────────────────
                 trailing_task = asyncio.create_task(
-                    self._trailing.run(dummy_idx, self._shm, self._trailing_event),
+                    self._trailing.run(option_sym_idx, self._shm, self._trailing_event),
                     name=f"{self._sid}_trailing",
                 )
 
