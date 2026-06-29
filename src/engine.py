@@ -13,11 +13,28 @@ from src.managers.atm_tracker import ATMTracker
 from src.trade_manager import TradeRegistry
 from src.strategies.strategy_one.handler import StrategyHandler
 
+
+class EngineStartupError(Exception):
+    """Connect ya Health-Check phase fail — Bootstrap se alag, yeh runtime infra failure hai."""
+    pass
+
+
 class Engine:
+
+    def __init__(self) -> None:
+        # None defaults — _init() beech mein fail ho jaye to bhi _stop() safely chal sake
+        self._shm          = None
+        self._symbols       = None
+        self._data_broker   = None
+        self._order_broker  = None
+        self._executor      = None
+        self._candles       = None
+        self._atm_tracker   = None
+        self._strategy      = None
 
     # ── Phase 1: Init ─────────────────────────────────────────
     def _init(self) -> None:
-        load_dotenv() # loading .env variables
+        load_dotenv()  # loading .env variables
         cfg = load()
         tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 
@@ -32,7 +49,7 @@ class Engine:
 
         for scfg in cfg['strategies']:
             self._symbols.add(scfg['entry_symbol'])
-            
+
         registry = TradeRegistry(self._shm)
 
         self._candles = CandleBuilder(self._shm, self._symbols)
@@ -54,25 +71,35 @@ class Engine:
 
         log.info("Engine: init done")
 
-    # ── Phase 2: Start ────────────────────────────────────────
-    async def _start(self) -> None:
+    # ── Phase 2: Connect ──────────────────────────────────────
+    # Sirf connection attempts fire karo — readiness verify yahan nahi.
+    async def _connect(self) -> None:
         loop = asyncio.get_running_loop()
 
-        self._data_broker.connect(loop)
-        self._order_broker.connect(loop)
-        await self._executor.connect()
+        self._data_broker.connect(loop)     # non-blocking, thread spawn karke return
+        self._order_broker.connect(loop)    # non-blocking, thread spawn karke return
+        await self._executor.connect()      # blocking — already self-retrying (REST_CONNECT_POLICY)
+                                             # + self-verifying (/profile check ke saath)
 
-        await self._wait_ready(self._data_broker.is_connected,  "DataBroker")
-        await self._wait_ready(self._order_broker.is_connected, "OrderBroker")
+        log.info("Engine: connect phase done — connection attempts fired")
 
-        log.info(f"Executor ready: {self._executor.is_connected()}")
+    # ── Phase 3: Health Check ─────────────────────────────────
+    # Verify karo ki Connect ne jo start kiya woh actually live hua ya nahi.
+    async def _health_check(self) -> None:
+        try:
+            await asyncio.gather(
+                self._wait_ready(self._data_broker.is_connected,  "DataBroker"),
+                self._wait_ready(self._order_broker.is_connected, "OrderBroker"),
+            )
+        except TimeoutError as e:
+            raise EngineStartupError(str(e)) from e
 
-        for sym in self._symbols.all_symbols():
-            self._data_broker.subscribe([sym])
+        if not self._executor.is_connected():
+            raise EngineStartupError("Executor not connected after connect phase")
 
-        log.info("Engine: start done — all connections live")
+        log.info(f"Engine: health check passed — Executor ready: {self._executor.is_connected()}")
 
-    # ── Phase 3: Run ──────────────────────────────────────────
+    # ── Phase 4: Run ──────────────────────────────────────────
     async def _run(self) -> None:
         log.info("Engine: running")
 
@@ -81,7 +108,7 @@ class Engine:
         )
         support_tasks = [
             asyncio.create_task(self._candles.run(),     name="candles"),
-            asyncio.create_task(self._atm_tracker.run(), name="atm_tracker"),  
+            asyncio.create_task(self._atm_tracker.run(), name="atm_tracker"),
         ]
 
         try:
@@ -100,21 +127,35 @@ class Engine:
             await asyncio.gather(*support_tasks, return_exceptions=True)
             log.info("Engine: support tasks stopped")
 
-    # ── Phase 4: Stop ─────────────────────────────────────────
+    # ── Phase 5: Stop ─────────────────────────────────────────
+    # Har step guarded — _init() ya _connect() beech mein fail ho jaye to bhi
+    # yeh None-check ke saath safely chalega, AttributeError nahi degā.
     async def _stop(self) -> None:
         log.info("Engine: stopping")
-        self._data_broker.disconnect()
-        self._order_broker.disconnect()
-        await self._executor.disconnect()
-        self._shm.cleanup()
+
+        if self._data_broker is not None:
+            self._data_broker.disconnect()
+
+        if self._order_broker is not None:
+            self._order_broker.disconnect()
+
+        if self._executor is not None:
+            await self._executor.disconnect()
+
+        if self._shm is not None:
+            self._shm.cleanup()
+
         log.info("Engine: stopped")
         stop_log_listener()
 
     # ── Entrypoint ────────────────────────────────────────────
+    # Sab phases EK try block ke andar — kisi bhi phase mein fail ho,
+    # _stop() guaranteed chalega (SHM cleanup, broker disconnect).
     async def run(self) -> None:
-        self._init()
-        await self._start()
         try:
+            self._init()
+            await self._connect()
+            await self._health_check()
             await self._run()
         finally:
             await self._stop()
