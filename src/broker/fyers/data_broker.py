@@ -8,6 +8,8 @@ from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
 from src.symbol_manager.symbol_manager import SymbolManager
 from src.core.dtypes import *
+from src.error_handling.reconnect import ReconnectSupervisor
+from src.error_handling.policies import WS_RECONNECT_POLICY
 
 class FyersDataBroker:
     def __init__(self, shm: ShmStore, symbols: SymbolManager):
@@ -19,6 +21,13 @@ class FyersDataBroker:
         self._loop    = None
         self._running = False
         self._connected = False
+
+        self._reconnect = ReconnectSupervisor(
+            name="FyersDataBroker",
+            reconnect_fn=self._attempt_reconnect,
+            is_connected_fn=self.is_connected,
+            policy=WS_RECONNECT_POLICY,
+        )
 
     def is_connected(self) -> bool:
         return self._connected
@@ -41,7 +50,19 @@ class FyersDataBroker:
         self._running = False
         self._connected = False
         if self._socket:
-            self._socket.close_connection()
+            try:
+                self._socket.close_connection()
+            except Exception as e:
+                log.error(f"FyersDataBroker: close_connection() error (ignoring): {e}")
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+    # ── reconnect ─────────────────────────────────────────────
+
+    def _attempt_reconnect(self) -> None:
+        log.info("FyersDataBroker: attempting reconnect")
+        self.disconnect()
+        self.connect(self._loop)
 
     # ── internal ──────────────────────────────────────────────
 
@@ -56,6 +77,10 @@ class FyersDataBroker:
         def _on_close(msg):
             self._connected = False
             log.info(f"Fyers data WS closed: {msg}")
+            if self._running:
+                self._reconnect.trigger()
+            else:
+                log.info("FyersDataBroker: intentional disconnect — reconnect skip")
 
         def _on_error(err):
             log.error(f"Fyers data WS error: {err}")

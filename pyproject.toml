@@ -10,5 +10,6 @@ dependencies = [
     "httpx[http2]>=0.28.1",
     "numpy>=2.4.4",
     "rich>=14.3.3",
+    "tenacity>=9.1.4",
     "uvloop>=0.22.1",
 ]

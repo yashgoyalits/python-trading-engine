@@ -5,6 +5,8 @@ from src.logger import log
 from fyers_apiv3.FyersWebsocket import order_ws
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
+from src.error_handling.reconnect import ReconnectSupervisor
+from src.error_handling.policies import WS_RECONNECT_POLICY
 
 class FyersOrderBroker:
     def __init__(self, shm: ShmStore):
@@ -16,6 +18,13 @@ class FyersOrderBroker:
         self._loop    = None
         self._running = False
         self._connected = False
+
+        self._reconnect = ReconnectSupervisor(
+            name="FyersOrderBroker",
+            reconnect_fn=self._attempt_reconnect,
+            is_connected_fn=self.is_connected,
+            policy=WS_RECONNECT_POLICY,
+        )
 
     def is_connected(self) -> bool:
         return self._connected
@@ -30,19 +39,36 @@ class FyersOrderBroker:
         self._running = False
         self._connected = False
         if self._socket:
-            self._socket.close_connection()
+            try:
+                self._socket.close_connection()
+            except Exception as e:
+                log.error(f"FyersOrderBroker: close_connection() error (ignoring): {e}")
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+    # ── reconnect ─────────────────────────────────────────────
+
+    def _attempt_reconnect(self) -> None:
+        log.info("FyersOrderBroker: attempting reconnect")
+        self.disconnect()
+        self.connect(self._loop)
 
     # ── callbacks (run in WS thread) ───────────────────────────
 
     def _run_ws(self):
         def _on_open():
             self._connected = True
-            self._fyers.subscribe(data_type="OnOrders")
-            self._fyers.subscribe(data_type="OnPositions")
+            self._socket.subscribe(data_type="OnOrders")
+            self._socket.subscribe(data_type="OnPositions")
             log.info("Fyers order WS connected")
 
         def _on_close(msg):
             self._connected = False
+            log.info(f"Fyers order WS closed: {msg}")
+            if self._running:
+                self._reconnect.trigger()
+            else:
+                log.info("FyersOrderBroker: intentional disconnect — reconnect skip")
 
         def _on_error(msg):
             log.error(f"Fyers order WS error: {msg}")
@@ -57,7 +83,7 @@ class FyersOrderBroker:
         def _on_position(msg):
             pass
 
-        self._fyers = order_ws.FyersOrderSocket(
+        self._socket = order_ws.FyersOrderSocket(
             access_token=f"{self._client_id}:{self._token}",
             reconnect=True,
             write_to_file=False,
@@ -69,9 +95,9 @@ class FyersOrderBroker:
             on_close=_on_close,
             on_error=_on_error,
         )
-        self._fyers.connect()
-        self._fyers.keep_running()
-    
+        self._socket.connect()
+        self._socket.keep_running()
+
 
     def _write_order(self, o: dict):
         ctrl = self._shm.order_ctrl[0]
