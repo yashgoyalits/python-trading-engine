@@ -3,14 +3,11 @@
 import os
 import asyncio
 import threading
-from dotenv import load_dotenv
 from src.logger import log
 from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
 from src.symbol_manager.symbol_manager import SymbolManager
 from src.core.dtypes import *
-
-load_dotenv()
 
 class FyersDataBroker:
     def __init__(self, shm: ShmStore, symbols: SymbolManager):

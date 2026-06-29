@@ -1,5 +1,6 @@
 # src/engine.py
 import asyncio
+from dotenv import load_dotenv
 from src.config import load
 from src.logger import log, stop_log_listener
 from src.core.shm_store import ShmStore
@@ -12,11 +13,11 @@ from src.managers.atm_tracker import ATMTracker
 from src.trade_manager import TradeRegistry
 from src.strategies.strategy_one.handler import StrategyHandler
 
-
 class Engine:
 
     # ── Phase 1: Init ─────────────────────────────────────────
     def _init(self) -> None:
+        load_dotenv() # loading .env variables
         cfg = load()
         tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 

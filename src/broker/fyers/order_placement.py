@@ -1,11 +1,7 @@
 import os
 import httpx
-from dotenv import load_dotenv
-
-load_dotenv()
 
 _BASE = "https://api-t1.fyers.in"
-
 
 class FyersOrderPlacement:
     def __init__(self):

@@ -3,11 +3,8 @@ import asyncio
 import threading
 from src.logger import log
 from fyers_apiv3.FyersWebsocket import order_ws
-from dotenv import load_dotenv
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_ORDERS
-
-load_dotenv()
 
 class FyersOrderBroker:
     def __init__(self, shm: ShmStore):
