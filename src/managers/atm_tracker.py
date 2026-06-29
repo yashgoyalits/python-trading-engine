@@ -1,13 +1,10 @@
 # src/managers/atm_tracker.py
-#
 # Background task — NIFTY ATM strike tracker
-#
 # SHM se tick padhta hai (candle_builder jaisa pattern),
 # sirf tab recalculate karta hai jab LTP 25-point boundary cross kare.
 # ATM aur ATM+1 ke 4 symbols (2 CE + 2 PE) continuously subscribed rakhta hai.
 
 import asyncio
-
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
