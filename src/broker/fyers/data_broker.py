@@ -7,7 +7,7 @@ from src.logger import log
 from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
 from src.symbol_manager.symbol_manager import SymbolManager
-from src.core.dtypes import *
+from src.core.dtypes import MAX_TICKS_PER_SYMBOL
 from src.error_handling.reconnect import ReconnectSupervisor
 from src.error_handling.policies import WS_RECONNECT_POLICY
 
