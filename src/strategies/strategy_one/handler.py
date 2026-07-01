@@ -79,11 +79,11 @@ class StrategyHandler:
 
                 # ── Entry Detection Lopp ────────────────────────
                 side, close_price = await self._entry_detection_loop.run()
-                log.info(f"[{self._sid}] Signal: side={side}, {close_price}")
+                log.info(f"[{self._sid}] Entry Signal Detected Side={side}")
 
                 # Strike price calculation  ────────────────────────
                 strike_price = atm_strike_price(close_price, side)
-                log.info(f"[{self._sid}] ATM Symbol: {strike_price}")
+                log.info(f"[{self._sid}] Option Entry Symbol: {strike_price}")
 
                 # Order Placement  ───────────────────────────────────────
                 try:
@@ -105,8 +105,8 @@ class StrategyHandler:
 
                 order_id     = res.get('id', '')
                 self._done  += 1
-                self._trades.add_trade(self._done, order_id)
-                log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
+                self._trades.add_trade(self._done, order_id, side=side)
+                log.info(f"[{self._sid}] #TradeNo:{self._done} Trade Placed | {order_id}")
 
                 # Subscribe Strike Price ───────────────────────────────────────
                 option_sym_idx = self._sym_sub_mgr.ensure(strike_price)

@@ -1,7 +1,6 @@
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TRAILING
 
-
 class ActiveTradeManager:
     def __init__(
         self,
@@ -15,7 +14,7 @@ class ActiveTradeManager:
 
     # ── write ops ─────────────────────────────────────────────
 
-    def add_trade(self, trade_no: int, order_id: str) -> None:
+    def add_trade(self, trade_no: int, order_id: str, side: int) -> None:
         r = self._buf[self._slot]
         r['active']          = True
         r['trade_no']        = trade_no
@@ -25,7 +24,7 @@ class ActiveTradeManager:
         r['target_order_id'] = b''
         r['symbol']          = b''
         r['qty']             = 0
-        r['side']            = 0
+        r['side']            = side
         r['entry_price']     = 0.0
         r['stop_price']      = 0.0
         r['target_price']    = 0.0
