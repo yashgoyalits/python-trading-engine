@@ -18,7 +18,6 @@ class FyersDataBroker:
         self._token   = os.getenv("FYERS_ACCESS_TOKEN")
         self._socket  = None
         self._thread  = None
-        self._loop    = None
         self._running = False
         self._connected = False
 
@@ -32,8 +31,7 @@ class FyersDataBroker:
     def is_connected(self) -> bool:
         return self._connected
 
-    def connect(self, loop: asyncio.AbstractEventLoop):
-        self._loop    = loop
+    def connect(self):
         self._running = True
         self._thread  = threading.Thread(target=self._run_ws, daemon=True)
         self._thread.start()
@@ -63,7 +61,7 @@ class FyersDataBroker:
     def _attempt_reconnect(self) -> None:
         log.info("FyersDataBroker: attempting reconnect")
         self.disconnect()
-        self.connect(self._loop)
+        self.connect()
 
     # ── internal ──────────────────────────────────────────────
 

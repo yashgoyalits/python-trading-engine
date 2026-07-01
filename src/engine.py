@@ -74,12 +74,9 @@ class Engine:
     # ── Phase 2: Connect ──────────────────────────────────────
     # Sirf connection attempts fire karo — readiness verify yahan nahi.
     async def _connect(self) -> None:
-        loop = asyncio.get_running_loop()
-
-        self._data_broker.connect(loop)     # non-blocking, thread spawn karke return
-        self._order_broker.connect(loop)    # non-blocking, thread spawn karke return
-        await self._executor.connect()      # blocking — already self-retrying (REST_CONNECT_POLICY)
-                                             # + self-verifying (/profile check ke saath)
+        self._data_broker.connect()     # non-blocking, thread spawn karke return
+        self._order_broker.connect()    # non-blocking, thread spawn karke return
+        await self._executor.connect()      # blocking — alreadifying
 
         log.info("Engine: connect phase done — connection attempts fired")
 
