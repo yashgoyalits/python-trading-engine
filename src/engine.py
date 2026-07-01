@@ -102,13 +102,14 @@ class Engine:
     async def _run(self) -> None:
         log.info("Engine: running")
 
-        strategy_task = asyncio.create_task(
-            self._strategy.run(), name="strategy"
-        )
         support_tasks = [
             asyncio.create_task(self._candles.run(),     name="candles"),
             asyncio.create_task(self._atm_tracker.run(), name="atm_tracker"),
         ]
+
+        strategy_task = asyncio.create_task(
+            self._strategy.run(), name="strategy"
+        )
 
         try:
             await strategy_task

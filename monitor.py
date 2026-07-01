@@ -1,56 +1,82 @@
 import asyncio
-import time
+
+from src.config import load
 from src.core.shm_store import ShmStore
-from src.infrastructure.shm_symbols import SymbolRegistry
 from src.core.dtypes import MAX_SYMBOLS, MAX_TICKS_PER_SYMBOL
 
 
 class Monitor:
     def __init__(self):
-        self.shm     = ShmStore(create=False)
-        self.symbols = SymbolRegistry()
-        self.symbols.register("NSE:NIFTY50-INDEX")
+        cfg = load()
+
+        self.shm = ShmStore(
+            timeframes=cfg["timeframes"],
+            create=False,
+        )
 
         self.last_tick_seq = [0] * MAX_SYMBOLS
-        self.tps           = [0.0] * MAX_SYMBOLS
 
     async def run(self):
-        print("Starting Monitor (Press Ctrl+C to stop)...")
-
+        print("Starting Monitor (Ctrl+C to stop)")
         while True:
-            current_seqs = []
-            for sym_name, sym_idx in self.symbols.all().items():
-                if sym_idx is None:
+            self.display()
+            await asyncio.sleep(1)
+
+    def display(self):
+        print("\033[H\033[J", end="")
+
+        total_tps = 0
+        total_ticks = 0
+        active_slots = 0
+
+        for sym_idx in range(MAX_SYMBOLS):
+            ctrl = self.shm.ctrl[sym_idx]
+
+            tick_seq = int(ctrl["tick_seq"])
+            if tick_seq == 0:
+                continue
+
+            active_slots += 1
+
+            tps = tick_seq - self.last_tick_seq[sym_idx]
+            self.last_tick_seq[sym_idx] = tick_seq
+
+            total_tps += tps
+            total_ticks += tick_seq
+
+        active_trades = sum(
+            1 for trade in self.shm.trades
+            if trade["active"]
+        )
+
+        order_ctrl = self.shm.order_ctrl[0]
+
+        print(f"Active Slots     : {active_slots}")
+        print(f"Total TPS        : {total_tps}")
+        print(f"Total Tick Count : {total_ticks}")
+        print(f"Active Trades    : {active_trades}")
+        print(f"Orders Written   : {int(order_ctrl['widx'])}")
+        print(f"Order Seq        : {int(order_ctrl['seq'])}")
+
+        print()
+        print("Candles")
+        print("-" * 30)
+
+        for tf, tf_idx in self.shm.tf_map.items():
+            total = 0
+
+            for sym_idx in range(MAX_SYMBOLS):
+                if self.shm.ctrl[sym_idx]["tick_seq"] == 0:
                     continue
 
-                c_seq = int(self.shm.ctrl[sym_idx]['tick_seq'])
-                diff  = c_seq - self.last_tick_seq[sym_idx]
-                self.tps[sym_idx]           = diff
-                self.last_tick_seq[sym_idx] = c_seq
+                total += int(
+                    self.shm.ctrl[sym_idx]["tf_seq"][tf_idx]
+                )
 
-                widx  = int(self.shm.ctrl[sym_idx]['tick_widx'])
-                l_idx = (widx - 1) % MAX_TICKS_PER_SYMBOL
-                tick  = self.shm.ticks[sym_idx * MAX_TICKS_PER_SYMBOL + l_idx]
+            print(f"{tf:>5}s : {total}")
 
-                current_seqs.append({
-                    "symbol":      sym_name,
-                    "ltp":         float(tick['ltp']),
-                    "tps":         self.tps[sym_idx],
-                    "total_ticks": c_seq,
-                })
-
-            self._display(current_seqs)
-            await asyncio.sleep(1.0)
-
-    def _display(self, data):
-        print("\033[H\033[J")
-        print(f"{'SYMBOL':<20} | {'LTP':<10} | {'TPS':<10} | {'TOTAL_TICKS':<15}")
-        print("-" * 65)
-        for d in data:
-            print(f"{d['symbol']:<20} | {d['ltp']:<10.2f} | {d['tps']:<10} | {d['total_ticks']:<15}")
-
-        o_ctrl = self.shm.order_ctrl[0]
-        print(f"\nOrders Processed: {o_ctrl['seq']}")
+    def close(self):
+        self.shm.cleanup()
 
 
 if __name__ == "__main__":
@@ -58,6 +84,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(monitor.run())
     except KeyboardInterrupt:
-        print("\nMonitor stopped.")
+        print("\nStopped.")
     finally:
-        monitor.shm.cleanup()
+        monitor.close()
