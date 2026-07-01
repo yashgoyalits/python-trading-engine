@@ -2,7 +2,6 @@
 from __future__ import annotations
 from src.core.dtypes import MAX_SYMBOLS
 
-
 class SymbolManager:
 
     def __init__(self, timeframes: list[int]):
@@ -11,15 +10,11 @@ class SymbolManager:
         self._tfs_default: list[int]           = timeframes
         self._next_idx:    int                 = 0
         self._free:        list[int]           = []  # freed slots pool
-        self._broker                           = None
 
         # tf_value → ctrl sub-array slot index, same as shm.tf_map
         self.tf_map: dict[int, int] = {
             tf: idx for idx, tf in enumerate(timeframes)
         }
-
-    def set_broker(self, broker) -> None:
-        self._broker = broker
 
     def add(self, symbol: str) -> int:
         if symbol not in self._map:
@@ -35,9 +30,6 @@ class SymbolManager:
         idx = self._map[symbol]
         self._tfs[idx] = self._tfs_default
 
-        if self._broker is not None:
-            self._broker.subscribe([symbol])
-
         return idx
 
     def remove(self, symbol: str) -> None:
@@ -47,14 +39,6 @@ class SymbolManager:
 
         self._tfs.pop(idx, None)
         self._free.append(idx)  # return slot to pool
-
-        if self._broker is not None:
-            self._broker.unsubscribe([symbol])
-
-    def sym_already_sub_or_not(self, symbol: str) -> int:
-        if symbol in self._map:
-            return self._map[symbol]
-        return self.add(symbol)
 
     def idx(self, symbol: str) -> int:
         # strict — KeyError if not registered

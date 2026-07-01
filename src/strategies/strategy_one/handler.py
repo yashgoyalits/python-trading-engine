@@ -4,6 +4,7 @@ from src.logger import log
 from src.db import csv
 from src.core.shm_store import ShmStore
 from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.subscription_manager import SubscriptionManager
 from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
 from src.strategies.strategy_one.entry_detection import EntryDetectionLoop
@@ -19,6 +20,7 @@ class StrategyHandler:
         trades: IActiveTradeManager,
         executor: BaseExecutor,
         config: dict,
+        sym_sub_mgr: SubscriptionManager,
     ):
         self._shm      = shm
         self._trades   = trades
@@ -27,6 +29,7 @@ class StrategyHandler:
         self._max      = config['max_trades']
         self._done     = 0
         self._symbols = symbols
+        self._sym_sub_mgr = sym_sub_mgr
 
         # Entry Symbol from Config
         sym_name = config['entry_symbol']
@@ -106,7 +109,7 @@ class StrategyHandler:
                 log.info(f"[{self._sid}] Trade #{self._done} placed | {order_id}")
 
                 # Subscribe Strike Price ───────────────────────────────────────
-                option_sym_idx = self._symbols.sym_already_sub_or_not(strike_price)
+                option_sym_idx = self._sym_sub_mgr.ensure(strike_price)
                 
                 # Trailing Task ───────────────────────────────────────
                 trailing_task = asyncio.create_task(

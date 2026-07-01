@@ -8,7 +8,7 @@ import asyncio
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
-from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.subscription_manager import SubscriptionManager
 from src.strategies.strategy_one.strike_price_helper import atm_strike_price
 
 _INTERVAL = 50
@@ -37,11 +37,11 @@ class ATMTracker:
     def __init__(
         self,
         shm: ShmStore,
-        symbols: SymbolManager,
+        sym_sub_mgr: SubscriptionManager,
         sym_idx: int,           # NIFTY50-INDEX ka shm index
     ):
         self._shm      = shm
-        self._symbols  = symbols
+        self._sym_sub_mgr = sym_sub_mgr
         self._sym_idx  = sym_idx
 
         # runtime state
@@ -105,10 +105,10 @@ class ATMTracker:
         to_remove = self._subscribed - wanted
 
         for sym in to_remove:
-            self._symbols.remove(sym)
+            self._sym_sub_mgr.remove(sym)
 
         for sym in to_add:
-            self._symbols.add(sym)
+            self._sym_sub_mgr.add(sym)
 
         self._subscribed  = wanted
         self._lower_bound = atm - _HALF   # e.g. 24200 - 25 = 24175
