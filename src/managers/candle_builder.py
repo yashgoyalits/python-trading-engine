@@ -3,13 +3,13 @@ import time
 import asyncio
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL, MAX_CANDLE_HISTORY
-from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_registry import SymbolRegistry
 
 
 class CandleBuilder:
-    def __init__(self, shm: ShmStore, manager: SymbolManager):
+    def __init__(self, shm: ShmStore, sym_rgstry: SymbolRegistry):
         self._shm     = shm
-        self._manager = manager
+        self._sym_rgstry = sym_rgstry
         # tf_value → sub-array slot index, e.g. {30: 0, 60: 1, 180: 2}
         self._tf_map: dict[int, int] = shm.tf_map
 
@@ -37,7 +37,7 @@ class CandleBuilder:
         last_widx: dict[int, int | None] = {}
 
         while True:
-            subscriptions = self._manager.subscriptions()
+            subscriptions = self._sym_rgstry.subscriptions()
 
             for sym_idx, timeframes in subscriptions.items():
 
@@ -95,7 +95,7 @@ class CandleBuilder:
             await asyncio.sleep(sleep_for)
 
             # Sab registered symbols ke liye candle close karo
-            for sym_idx in self._manager.subscriptions():
+            for sym_idx in self._sym_rgstry.subscriptions():
                 self._close_candle(sym_idx, tf, next_wall)
 
     # ── candle close — timer se trigger hota hai ─────────────

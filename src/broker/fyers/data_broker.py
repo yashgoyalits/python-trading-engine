@@ -6,15 +6,15 @@ import threading
 from src.logger import log
 from fyers_apiv3.FyersWebsocket import data_ws
 from src.core.shm_store import ShmStore
-from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_registry import SymbolRegistry
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
 from src.error_handling.reconnect import ReconnectSupervisor
 from src.error_handling.policies import WS_RECONNECT_POLICY
 
 class FyersDataBroker:
-    def __init__(self, shm: ShmStore, symbols: SymbolManager):
+    def __init__(self, shm: ShmStore, sym_rgstry: SymbolRegistry):
         self._shm     = shm
-        self._symbols = symbols          # get() method use hota hai — interface same
+        self._sym_rgstry = sym_rgstry          # get() method use hota hai — interface same
         self._token   = os.getenv("FYERS_ACCESS_TOKEN")
         self._socket  = None
         self._thread  = None
@@ -68,7 +68,7 @@ class FyersDataBroker:
     def _run_ws(self):
         def _on_open():
             self._connected = True
-            syms = list(self._symbols.all_symbols().keys())
+            syms = list(self._sym_rgstry.all_symbols().keys())
             if syms:
                 self.subscribe(syms)
             log.info(f"Fyers data WS connected")
@@ -88,7 +88,7 @@ class FyersDataBroker:
             if msg.get("type") not in ("if", "sf"):
                 return
             sym = msg.get("symbol")
-            idx = self._symbols.get(sym)   # SymbolManager.get() — same as before
+            idx = self._sym_rgstry.get(sym)   # SymbolManager.get() — same as before
             if idx is None:
                 return
             self._write_tick(idx, msg)

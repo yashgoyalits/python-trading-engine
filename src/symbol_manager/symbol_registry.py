@@ -2,7 +2,7 @@
 from __future__ import annotations
 from src.core.dtypes import MAX_SYMBOLS
 
-class SymbolManager:
+class SymbolRegistry:
 
     def __init__(self, timeframes: list[int]):
         self._map:         dict[str, int]      = {}

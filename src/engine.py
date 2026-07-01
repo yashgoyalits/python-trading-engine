@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from src.config import load
 from src.logger import log, stop_log_listener
 from src.core.shm_store import ShmStore
-from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_registry import SymbolRegistry
 from src.symbol_manager.subscription_manager import SubscriptionManager
 from src.broker.fyers.data_broker import FyersDataBroker
 from src.broker.fyers.order_broker import FyersOrderBroker
@@ -24,8 +24,8 @@ class Engine:
 
     def __init__(self) -> None:
         # None defaults — _init() beech mein fail ho jaye to bhi _stop() safely chal sake
-        self._shm          = None
-        self._sym_manager       = None
+        self._shm           = None
+        self._sym_rgstry    = None
         self._data_broker   = None
         self._order_broker  = None
         self._executor      = None
@@ -40,25 +40,25 @@ class Engine:
         tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 
         self._shm     = ShmStore(timeframes=tfs, create=True)
-        self._sym_manager = SymbolManager(timeframes=tfs)
+        self._sym_rgstry = SymbolRegistry(timeframes=tfs)
 
-        self._data_broker  = FyersDataBroker(self._shm, self._sym_manager)
+        self._data_broker  = FyersDataBroker(self._shm, self._sym_rgstry)
         self._order_broker = FyersOrderBroker(self._shm)
         self._executor     = LiveExecutor()
 
-        self._sym_sub_mgr = SubscriptionManager(self._sym_manager, self._data_broker)
+        self._sym_sub_mgr = SubscriptionManager(self._sym_rgstry, self._data_broker)
 
         for scfg in cfg['strategies']:
             self._sym_sub_mgr.add(scfg['entry_symbol'])
 
         registry = TradeRegistry(self._shm)
 
-        self._candles = CandleBuilder(self._shm, self._sym_manager)
+        self._candles = CandleBuilder(self._shm, self._sym_rgstry)
 
         scfg = cfg['strategies'][0]
         self._strategy = StrategyHandler(
             shm=self._shm,
-            symbols=self._sym_manager,
+            sym_rgstry=self._sym_rgstry,
             trades=registry.register(scfg['id']),
             executor=self._executor,
             config=scfg,
@@ -68,7 +68,7 @@ class Engine:
         self._atm_tracker = ATMTracker(
             shm=self._shm,
             sym_sub_mgr=self._sym_sub_mgr,
-            sym_idx=self._sym_manager.idx("NSE:NIFTY50-INDEX"),
+            sym_idx=self._sym_rgstry.idx("NSE:NIFTY50-INDEX"),
         )
 
         log.info("Engine: init done")

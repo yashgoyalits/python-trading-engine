@@ -3,7 +3,7 @@ import asyncio
 from src.logger import log
 from src.db import csv
 from src.core.shm_store import ShmStore
-from src.symbol_manager.symbol_manager import SymbolManager
+from src.symbol_manager.symbol_registry import SymbolRegistry
 from src.symbol_manager.subscription_manager import SubscriptionManager
 from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
@@ -16,7 +16,7 @@ class StrategyHandler:
     def __init__(
         self,
         shm: ShmStore,
-        symbols: SymbolManager,
+        sym_rgstry: SymbolRegistry,
         trades: IActiveTradeManager,
         executor: BaseExecutor,
         config: dict,
@@ -28,12 +28,12 @@ class StrategyHandler:
         self._sid      = config['id']
         self._max      = config['max_trades']
         self._done     = 0
-        self._symbols = symbols
+        self._sym_rgstry = sym_rgstry
         self._sym_sub_mgr = sym_sub_mgr
 
         # Entry Symbol from Config
         sym_name = config['entry_symbol']
-        self._sym_idx = symbols.idx(sym_name)
+        self._sym_idx = sym_rgstry.idx(sym_name)
 
         # Order params from Config
         ocfg              = config['order']
