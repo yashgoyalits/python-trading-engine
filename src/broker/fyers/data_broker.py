@@ -71,7 +71,7 @@ class FyersDataBroker:
             syms = list(self._symbols.all_symbols().keys())
             if syms:
                 self.subscribe(syms)
-            log.info(f"Fyers data WS connected — {len(syms)} symbols re-subscribed")
+            log.info(f"Fyers data WS connected")
 
         def _on_close(msg):
             self._connected = False
