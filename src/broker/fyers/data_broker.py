@@ -67,10 +67,10 @@ class FyersDataBroker:
 
     def _run_ws(self):
         def _on_open():
+            self._connected = True
             syms = list(self._symbols.all_symbols().keys())
             if syms:
                 self.subscribe(syms)
-            self._connected = True
             log.info(f"Fyers data WS connected")
 
         def _on_close(msg):

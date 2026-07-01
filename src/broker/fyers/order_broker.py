@@ -55,9 +55,9 @@ class FyersOrderBroker:
 
     def _run_ws(self):
         def _on_open():
+            self._connected = True
             self._socket.subscribe(data_type="OnOrders")
             self._socket.subscribe(data_type="OnPositions")
-            self._connected = True
             log.info("Fyers order WS connected")
 
         def _on_close(msg):
