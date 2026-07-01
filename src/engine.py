@@ -24,7 +24,7 @@ class Engine:
     def __init__(self) -> None:
         # None defaults — _init() beech mein fail ho jaye to bhi _stop() safely chal sake
         self._shm          = None
-        self._symbols       = None
+        self._sym_manager       = None
         self._data_broker   = None
         self._order_broker  = None
         self._executor      = None
@@ -39,25 +39,25 @@ class Engine:
         tfs = cfg['timeframes']   # [30, 60, 180] — ek jagah se sab
 
         self._shm     = ShmStore(timeframes=tfs, create=True)
-        self._symbols = SymbolManager(timeframes=tfs)
+        self._sym_manager = SymbolManager(timeframes=tfs)
 
-        self._data_broker  = FyersDataBroker(self._shm, self._symbols)
+        self._data_broker  = FyersDataBroker(self._shm, self._sym_manager)
         self._order_broker = FyersOrderBroker(self._shm)
         self._executor     = LiveExecutor()
 
-        self._symbols.set_broker(self._data_broker)
+        self._sym_manager.set_broker(self._data_broker)
 
         for scfg in cfg['strategies']:
-            self._symbols.add(scfg['entry_symbol'])
+            self._sym_manager.add(scfg['entry_symbol'])
 
         registry = TradeRegistry(self._shm)
 
-        self._candles = CandleBuilder(self._shm, self._symbols)
+        self._candles = CandleBuilder(self._shm, self._sym_manager)
 
         scfg = cfg['strategies'][0]
         self._strategy = StrategyHandler(
             shm=self._shm,
-            symbols=self._symbols,
+            symbols=self._sym_manager,
             trades=registry.register(scfg['id']),
             executor=self._executor,
             config=scfg,
@@ -65,8 +65,8 @@ class Engine:
 
         self._atm_tracker = ATMTracker(
             shm     = self._shm,
-            symbols = self._symbols,
-            sym_idx = self._symbols.idx("NSE:NIFTY50-INDEX"),
+            symbols = self._sym_manager,
+            sym_idx = self._sym_manager.idx("NSE:NIFTY50-INDEX"),
         )
 
         log.info("Engine: init done")

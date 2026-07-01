@@ -40,6 +40,7 @@ class FyersDataBroker:
 
     def subscribe(self, symbols: list[str]):
         if self._socket and self._connected:
+            log.info(f"Subscribe -> {symbols}")
             self._socket.subscribe(symbols, "SymbolUpdate")
 
     def unsubscribe(self, symbols: list[str]):
@@ -71,7 +72,7 @@ class FyersDataBroker:
             self._connected = True
             syms = list(self._symbols.all_symbols().keys())
             if syms:
-                self._socket.subscribe(syms, "SymbolUpdate")
+                self.subscribe(syms)
             log.info(f"Fyers data WS connected — {len(syms)} symbols re-subscribed")
 
         def _on_close(msg):
