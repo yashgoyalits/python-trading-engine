@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 
 _FIELDS = (
-    "trade_no", "strategy_id", "symbol", "side", "qty",
+    "trade_no", "strategy_id", "symbol", "side", "direction", "qty",
     "entry_price", "stop_price", "target_price",
     "order_id", "stop_order_id", "target_order_id",
     "closed_at",
@@ -30,6 +30,7 @@ class TradeCSVLogger:
             trade_view["strategy_id"].tobytes().rstrip(b"\x00").decode(),
             trade_view["symbol"].tobytes().rstrip(b"\x00").decode(),
             int(trade_view["side"]),
+            int(trade_view["direction"]),
             int(trade_view["qty"]),
             float(trade_view["entry_price"]),
             float(trade_view["stop_price"]),

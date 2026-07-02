@@ -80,12 +80,21 @@ class StrategyHandler:
             while self._done < self._max:
 
                 # ── Entry Detection Lopp ────────────────────────
-                side, close_price = await self._entry_detection_loop.run()
-                log.info(f"[{self._sid}] Entry Signal Detected Side={side}")
+                direction, close_price = await self._entry_detection_loop.run()
+                log.info(f"[{self._sid}] Entry Signal Detected Side={direction}")
 
                 # Strike price calculation  ────────────────────────
-                strike_price = atm_strike_price(close_price, side)
+                strike_price = atm_strike_price(close_price, direction)
                 log.info(f"[{self._sid}] Option Entry Symbol: {strike_price}")
+
+                # check for passing correct order_side to broker for placing order
+                # for normal order needed where sell and buy order both can place then False 
+                # for option buying where only buy order needed then True
+                # currently direction = 1 and -1
+                if False:
+                    side=1 
+                else:
+                    side=direction
 
                 # Order Placement  ───────────────────────────────────────
                 try:
@@ -107,11 +116,13 @@ class StrategyHandler:
 
                 order_id     = res.get('id', '')
                 self._done  += 1
-                self._trade_mgr.add_trade(self._done, order_id, side=side)
+                self._trade_mgr.add_trade(self._done, order_id, side=side, direction=direction)
                 log.info(f"[{self._sid}] #TradeNo:{self._done} Trade Placed | {order_id}")
 
+                
                 # Subscribe Strike Price ───────────────────────────────────────
                 option_sym_idx = self._sym_sub_mgr.ensure(strike_price)
+                
                 
                 # Trailing Task ───────────────────────────────────────
                 trailing_task = asyncio.create_task(
@@ -119,32 +130,40 @@ class StrategyHandler:
                     name=f"{self._sid}_trailing",
                 )
 
+                
                 # Waiting for— jab tak parent order fill na ho
                 await self._parent_filled_event.wait()
 
+                
                 # Entry price padho, trailing levels calculate karo
                 active_trade = self._trade_mgr.get_active()
                 entry_price = float(active_trade['entry_price'])
-                self._trade_mgr.update(order_id, trailing_levels=self._calc_trailing(entry_price))
+                trailing_levels = self._calc_trailing(entry_price, direction)
+                self._trade_mgr.update(order_id, trailing_levels=trailing_levels)
                 log.info(f"[{self._sid}] Trailing levels set | entry={entry_price}")
 
+                
                 # TrailingManager ko jagao
                 self._trailing_event.set()
                 self._parent_filled_event.clear()
 
+                
                 # waiting for trade close 
                 await self._trade_closed_event.wait()
 
+                
                 # Log Trade After Closed ───────────────────────────────────────
                 active_trade = self._trade_mgr.get_active()
                 active_trade_id = active_trade['order_id'].tobytes().rstrip(b'\x00').decode()
                 csv.log_close(active_trade)
                 self._trade_mgr.close_trade(active_trade_id)
 
+                
                 # Clear Events ───────────────────────────────────────
                 self._trade_closed_event.clear()
                 self._trailing_event.clear()
 
+                
                 # Cancel Trailing Task ───────────────────────────────────────
                 trailing_task.cancel()
                 await asyncio.gather(trailing_task, return_exceptions=True)
@@ -158,12 +177,12 @@ class StrategyHandler:
         log.info(f"[{self._sid}] Max trades reached. Done.")
 
 
-    # ── trailing calc — config se ─────────────────────────────
-    def _calc_trailing(self, entry: float) -> list[dict]:
+    # ── trailing_levels calculation — config se ─────────────────────────────
+    def _calc_trailing(self, entry_price: float, side: int) -> list[dict]:
         return [
             {
-                "threshold": entry + lvl['threshold_offset'],
-                "new_stop":  entry + lvl['new_stop_offset'],
+                "threshold": entry_price + side * lvl["threshold_offset"],
+                "new_stop":  entry_price + side * lvl['new_stop_offset'],
                 "hit":       False,
             }
             for lvl in self._trailing_cfg

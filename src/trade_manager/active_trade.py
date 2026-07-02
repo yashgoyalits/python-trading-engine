@@ -14,7 +14,7 @@ class ActiveTradeManager:
 
     # ── write ops ─────────────────────────────────────────────
 
-    def add_trade(self, trade_no: int, order_id: str, side: int) -> None:
+    def add_trade(self, trade_no: int, order_id: str, side: int, direction: int) -> None:
         r = self._buf[self._slot]
         r['active']          = True
         r['trade_no']        = trade_no
@@ -25,6 +25,7 @@ class ActiveTradeManager:
         r['symbol']          = b''
         r['qty']             = 0
         r['side']            = side
+        r['direction']       = direction
         r['entry_price']     = 0.0
         r['stop_price']      = 0.0
         r['target_price']    = 0.0
