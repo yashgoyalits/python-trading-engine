@@ -11,17 +11,15 @@ class OrderMonitor:
         self,
         shm: ShmStore,
         trades: IActiveTradeManager,
-        trailing_event: asyncio.Event,
-        trade_closed_event: asyncio.Event,
         strategy_id: str,
-        trailing_cfg: list[dict],
+        parent_filled_event: asyncio.Event,
+        trade_closed_event: asyncio.Event,
     ):
         self._shm                = shm
         self._trades             = trades
-        self._trailing_event     = trailing_event
-        self._trade_closed_event = trade_closed_event   # handler ko signal
         self._sid                = strategy_id
-        self._trailing_cfg       = trailing_cfg
+        self._parent_filled_event= parent_filled_event
+        self._trade_closed_event = trade_closed_event   
 
     # ── main loop ─────────────────────────────────────────────
 
@@ -81,8 +79,7 @@ class OrderMonitor:
                 symbol       = slot['symbol'].tobytes().rstrip(b'\x00').decode()
                 log.info(f"[{self._sid}] Parent filled | {order_id}")
                 self._trades.update(trade_id, symbol=symbol, qty=qty, entry_price=traded_price)
-                self._trades.update(trade_id, trailing_levels=self._calc_trailing(traded_price))
-                self._trailing_event.set()
+                self._parent_filled_event.set()  # Handler ko signal that parent fill
             return
 
         # ── child orders ──────────────────────────────────────
@@ -101,19 +98,7 @@ class OrderMonitor:
 
             if status == 2:
                 log.info(f"[{self._sid}] Child filled | {order_id}")
-                self._trade_closed_event.set()   # ← handler ko signal — trade done
+                self._trade_closed_event.set()   # ← handler ko signal — trade completed
 
             if status == 1:
                 log.info(f"[{self._sid}] Child cancelled | {order_id}")
-
-    # ── trailing calc — config se ─────────────────────────────
-
-    def _calc_trailing(self, entry: float) -> list[dict]:
-        return [
-            {
-                "threshold": entry + lvl['threshold_offset'],
-                "new_stop":  entry + lvl['new_stop_offset'],
-                "hit":       False,
-            }
-            for lvl in self._trailing_cfg
-        ]

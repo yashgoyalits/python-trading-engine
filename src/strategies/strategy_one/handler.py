@@ -43,8 +43,12 @@ class StrategyHandler:
         self._take_profit = ocfg['take_profit']
 
         # Events
+        self._parent_filled_event= asyncio.Event()
         self._trade_closed_event = asyncio.Event()
-        self._trailing_event     = asyncio.Event()
+        self._trailing_event      = asyncio.Event()
+
+        # trailling levels
+        self._trailing_cfg = config['trailing']
 
         # Sub-components — sirf zaroorat ki cheezein pass karo
         self._entry_detection_loop = EntryDetectionLoop(
@@ -56,15 +60,14 @@ class StrategyHandler:
         self._order_monitor = OrderMonitor(
             shm=shm,
             trades=trade_mgr,
-            trailing_event=self._trailing_event,
-            trade_closed_event=self._trade_closed_event,
             strategy_id=self._sid,
-            trailing_cfg=config['trailing'],
+            parent_filled_event=self._parent_filled_event,
+            trade_closed_event=self._trade_closed_event,
         )
         self._trailing = TrailingManager(trade_mgr, executor)
 
-    # ── main lifecycle ────────────────────────────────────────
 
+    # ── main lifecycle ────────────────────────────────────────
     async def run(self):
         log.info(f"[{self._sid}] Starting — max trades: {self._max}")
 
@@ -117,13 +120,27 @@ class StrategyHandler:
                     name=f"{self._sid}_trailing",
                 )
 
+                # Wait — jab tak parent order fill na ho
+                await self._parent_filled_event.wait()
+
+                # Entry price padho, trailing levels calculate karo
+                active_trade = self._trade_mgr.get_active()
+                entry_price = float(active_trade['entry_price'])
+                self._trade_mgr.update(order_id, trailing_levels=self._calc_trailing(entry_price))
+                log.info(f"[{self._sid}] Trailing levels set | entry={entry_price}")
+                log.info(active_trade['trailing'])
+
+                # TrailingManager ko jagao
+                self._trailing_event.set()
+                self._parent_filled_event.clear()
+
                 await self._trade_closed_event.wait()
 
                 # Log Trade After Closed ───────────────────────────────────────
-                trade = self._trade_mgr.get_active()
-                trade_id = trade['order_id'].tobytes().rstrip(b'\x00').decode()
-                csv.log_close(trade)
-                self._trade_mgr.close_trade(trade_id)
+                active_trade = self._trade_mgr.get_active()
+                active_trade_id = active_trade['order_id'].tobytes().rstrip(b'\x00').decode()
+                csv.log_close(active_trade)
+                self._trade_mgr.close_trade(active_trade_id)
 
                 # Clear Events ───────────────────────────────────────
                 self._trade_closed_event.clear()
@@ -140,3 +157,15 @@ class StrategyHandler:
             await asyncio.gather(monitor_task, return_exceptions=True)
 
         log.info(f"[{self._sid}] Max trades reached. Done.")
+
+
+    # ── trailing calc — config se ─────────────────────────────
+    def _calc_trailing(self, entry: float) -> list[dict]:
+        return [
+            {
+                "threshold": entry + lvl['threshold_offset'],
+                "new_stop":  entry + lvl['new_stop_offset'],
+                "hit":       False,
+            }
+            for lvl in self._trailing_cfg
+        ]
