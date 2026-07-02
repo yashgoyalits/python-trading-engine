@@ -11,7 +11,7 @@ from src.broker.fyers.order_broker import FyersOrderBroker
 from src.executor.live_executor import LiveExecutor
 from src.managers.candle_builder import CandleBuilder
 from src.managers.atm_tracker import ATMTracker
-from src.trade_manager import TradeRegistry
+from src.trade_manager.registry import TradeManagerFactory
 from src.strategies.strategy_one.handler import StrategyHandler
 
 
@@ -51,7 +51,7 @@ class Engine:
         for scfg in cfg['strategies']:
             self._sym_sub_mgr.add(scfg['entry_symbol'])
 
-        registry = TradeRegistry(self._shm)
+        trade_mgr = TradeManagerFactory(self._shm)
 
         self._candles = CandleBuilder(self._shm, self._sym_rgstry)
 
@@ -59,7 +59,7 @@ class Engine:
         self._strategy = StrategyHandler(
             shm=self._shm,
             sym_rgstry=self._sym_rgstry,
-            trades=registry.register(scfg['id']),
+            trades=trade_mgr.create(scfg['id']),
             executor=self._executor,
             config=scfg,
             sym_sub_mgr=self._sym_sub_mgr,
