@@ -6,8 +6,8 @@ from src.trade_manager import IActiveTradeManager
 from src.executor.base_executor import BaseExecutor
 
 class TrailingManager:
-    def __init__(self, trades: IActiveTradeManager, executor: BaseExecutor):
-        self._trades   = trades
+    def __init__(self, trade_mgr: IActiveTradeManager, executor: BaseExecutor):
+        self._trade_mgr   = trade_mgr
         self._executor = executor
     
     async def run(self, sym_idx: int, shm: ShmStore, event: asyncio.Event):
@@ -21,7 +21,7 @@ class TrailingManager:
             log.info("TrailingManager: active, ticks watch kar raha hai")
 
             while True:
-                trade = self._trades.get_active()
+                trade = self._trade_mgr.get_active()
                 if trade is None:
                     event.clear()
                     log.info("TrailingManager: trade closed, so raha hai")
@@ -69,7 +69,7 @@ class TrailingManager:
             if ltp > float(lvl['threshold']):
                 log.info("I want to place and modify order")
                 trade_id = active_trade_view['order_id'].tobytes().rstrip(b'\x00').decode()
-                self._trades.mark_trailing_hit(trade_id, i)
+                self._trade_mgr.mark_trailing_hit(trade_id, i)
                 # res = await self._place.modify_order(
                 #     stop_oid,
                 #     order_type=4,
