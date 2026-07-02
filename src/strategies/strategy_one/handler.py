@@ -138,7 +138,7 @@ class StrategyHandler:
                 # Entry price padho, trailing levels calculate karo
                 active_trade = self._trade_mgr.get_active()
                 entry_price = float(active_trade['entry_price'])
-                trailing_levels = self._calc_trailing(entry_price, direction)
+                trailing_levels = self._calc_trailing(entry_price, side)
                 self._trade_mgr.update(order_id, trailing_levels=trailing_levels)
                 log.info(f"[{self._sid}] Trailing levels set | entry={entry_price}")
 
