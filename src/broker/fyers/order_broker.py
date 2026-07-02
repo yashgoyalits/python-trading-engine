@@ -1,5 +1,4 @@
 import os
-import asyncio
 import threading
 from src.logger import log
 from fyers_apiv3.FyersWebsocket import order_ws

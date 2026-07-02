@@ -1,5 +1,4 @@
 import csv as _csv        # ← alias karo, collision khatam
-import os
 import time
 from datetime import date
 from pathlib import Path
