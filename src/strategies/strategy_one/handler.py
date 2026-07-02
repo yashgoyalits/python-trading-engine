@@ -47,6 +47,9 @@ class StrategyHandler:
         self._trade_closed_event = asyncio.Event()
         self._trailing_event      = asyncio.Event()
 
+
+        self._OPTION_MODE = False
+
         # trailling levels
         self._trailing_cfg = config['trailing']
 
@@ -91,7 +94,7 @@ class StrategyHandler:
                 # for normal order needed where sell and buy order both can place then False 
                 # for option buying where only buy order needed then True
                 # currently direction = 1 and -1
-                if False:
+                if self._OPTION_MODE:
                     side=1 
                 else:
                     side=direction
