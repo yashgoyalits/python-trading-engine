@@ -120,7 +120,7 @@ class StrategyHandler:
                     name=f"{self._sid}_trailing",
                 )
 
-                # Wait — jab tak parent order fill na ho
+                # Waiting for— jab tak parent order fill na ho
                 await self._parent_filled_event.wait()
 
                 # Entry price padho, trailing levels calculate karo
@@ -134,6 +134,7 @@ class StrategyHandler:
                 self._trailing_event.set()
                 self._parent_filled_event.clear()
 
+                # waiting for trade close 
                 await self._trade_closed_event.wait()
 
                 # Log Trade After Closed ───────────────────────────────────────
