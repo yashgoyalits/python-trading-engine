@@ -1,6 +1,7 @@
 import csv as _csv        # ← alias karo, collision khatam
 import os
 import time
+from datetime import date
 from pathlib import Path
 
 _FIELDS = (
@@ -15,7 +16,9 @@ _CSV_DIR      = _PROJECT_ROOT / "csv"
 
 
 class TradeCSVLogger:
-    def __init__(self, filename: str = "trades.csv"):
+    def __init__(self, filename: str | None = None):
+        if filename is None:
+            filename = f"trade_{date.today().strftime('%Y-%m-%d')}.csv"
         _CSV_DIR.mkdir(exist_ok=True)
         self._path = _CSV_DIR / filename
         if not self._path.exists():
