@@ -10,21 +10,15 @@ class EntryDetectionLoop:
         self,
         shm: ShmStore,
         sym_idx: int,
-        strategy_id: str,
-        config: dict,
+        entry_tf: int, 
     ):
-        self._shm     = shm
-        self._sym_idx = sym_idx
-        self._sid     = strategy_id
-        self._logic   = EntryLogic()
-
-        entry_tf      = config['entry_tf']
+        self._shm      = shm
+        self._sym_idx  = sym_idx
+        self._logic    = EntryLogic()
         self._entry_tf = entry_tf
+        self._tf_idx   = shm.tf_map[entry_tf]
+        self._base     = sym_idx * MAX_CANDLE_HISTORY
 
-        # Precompute both — neither changes after init
-        # tf_idx: integer slot index into ctrl sub-arrays
-        self._tf_idx = shm.tf_map[entry_tf]
-        self._base   = sym_idx * MAX_CANDLE_HISTORY
 
     async def run(self) -> tuple[int, float]:
         """

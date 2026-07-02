@@ -54,8 +54,7 @@ class StrategyHandler:
         self._entry_detection_loop = EntryDetectionLoop(
             shm=shm,
             sym_idx=self._sym_idx,
-            strategy_id=self._sid,
-            config=config,
+            entry_tf=config['entry_tf'],
         )
         self._order_monitor = OrderMonitor(
             shm=shm,
@@ -128,7 +127,6 @@ class StrategyHandler:
                 entry_price = float(active_trade['entry_price'])
                 self._trade_mgr.update(order_id, trailing_levels=self._calc_trailing(entry_price))
                 log.info(f"[{self._sid}] Trailing levels set | entry={entry_price}")
-                log.info(active_trade['trailing'])
 
                 # TrailingManager ko jagao
                 self._trailing_event.set()
