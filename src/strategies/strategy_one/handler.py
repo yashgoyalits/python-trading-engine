@@ -17,13 +17,13 @@ class StrategyHandler:
         self,
         shm: ShmStore,
         sym_rgstry: SymbolRegistry,
-        trades: IActiveTradeManager,
+        trade_mgr: IActiveTradeManager,
         executor: BaseExecutor,
         config: dict,
         sym_sub_mgr: SubscriptionManager,
     ):
         self._shm      = shm
-        self._trades   = trades
+        self._trade_mgr   = trade_mgr
         self._executor = executor
         self._sid      = config['id']
         self._max      = config['max_trades']
@@ -55,13 +55,13 @@ class StrategyHandler:
         )
         self._order_monitor = OrderMonitor(
             shm=shm,
-            trades=trades,
+            trades=trade_mgr,
             trailing_event=self._trailing_event,
             trade_closed_event=self._trade_closed_event,
             strategy_id=self._sid,
             trailing_cfg=config['trailing'],
         )
-        self._trailing = TrailingManager(trades, executor)
+        self._trailing = TrailingManager(trade_mgr, executor)
 
     # ── main lifecycle ────────────────────────────────────────
 
@@ -105,7 +105,7 @@ class StrategyHandler:
 
                 order_id     = res.get('id', '')
                 self._done  += 1
-                self._trades.add_trade(self._done, order_id, side=side)
+                self._trade_mgr.add_trade(self._done, order_id, side=side)
                 log.info(f"[{self._sid}] #TradeNo:{self._done} Trade Placed | {order_id}")
 
                 # Subscribe Strike Price ───────────────────────────────────────
@@ -120,10 +120,10 @@ class StrategyHandler:
                 await self._trade_closed_event.wait()
 
                 # Log Trade After Closed ───────────────────────────────────────
-                trade = self._trades.get_active()
+                trade = self._trade_mgr.get_active()
                 trade_id = trade['order_id'].tobytes().rstrip(b'\x00').decode()
                 csv.log_close(trade)
-                self._trades.close_trade(trade_id)
+                self._trade_mgr.close_trade(trade_id)
 
                 # Clear Events ───────────────────────────────────────
                 self._trade_closed_event.clear()

@@ -59,7 +59,7 @@ class Engine:
         self._strategy = StrategyHandler(
             shm=self._shm,
             sym_rgstry=self._sym_rgstry,
-            trades=trade_mgr.create(scfg['id']),
+            trade_mgr=trade_mgr.create(scfg['id']),
             executor=self._executor,
             config=scfg,
             sym_sub_mgr=self._sym_sub_mgr,
