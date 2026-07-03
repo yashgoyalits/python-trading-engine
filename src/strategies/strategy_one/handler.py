@@ -32,7 +32,7 @@ class StrategyHandler:
         self._sym_sub_mgr = sym_sub_mgr
 
         # Entry Symbol from Config
-        sym_name = config['entry_symbol']
+        sym_name = config['entry_detect_symbol']
         self._sym_idx = sym_rgstry.idx(sym_name)
 
         # Order params from Config

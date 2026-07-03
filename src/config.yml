@@ -2,12 +2,14 @@
 
 # Sab strategies ke liye common timeframes seconds mein
 timeframes: [30, 60, 180, 300, 1500]
+symbols:
+  - "NSE:NIFTY50-INDEX"
 
 strategies:
   - id: STRATEGY_ONE
     name: "Strategy One"
     description: "Nifty index entry on candle body signal"
-    entry_symbol: "NSE:NIFTY50-INDEX"
+    entry_detect_symbol: "NSE:NIFTY50-INDEX"
     max_trades: 1
     entry_tf: 30
 

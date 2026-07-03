@@ -48,8 +48,8 @@ class Engine:
 
         self._sym_sub_mgr = SubscriptionManager(self._sym_rgstry, self._data_broker)
 
-        for scfg in cfg['strategies']:
-            self._sym_sub_mgr.add(scfg['entry_symbol'])
+        for sym in cfg['symbols']:
+            self._sym_sub_mgr.add(sym)
 
         trade_mgr = TradeManagerFactory(self._shm)
 
