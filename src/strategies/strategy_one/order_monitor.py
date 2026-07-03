@@ -87,14 +87,14 @@ class OrderMonitor:
             if status == 6 and order_type == 4:
                 stop_price = float(slot['stop_price'])
                 if order_id != trade['stop_order_id'].tobytes().rstrip(b'\x00').decode():
-                    log.info(f"[{self._sid}] Child SL update")
                     self._trades.update(trade_id, stop_order_id=order_id, stop_price=stop_price)
+                    log.info(f"[{self._sid}] Child Order | SL update | Price:{stop_price}")
 
             if status == 6 and order_type == 1:
                 limit_price = float(slot['limit_price'])
                 if order_id != trade['target_order_id'].tobytes().rstrip(b'\x00').decode():
-                    log.info(f"[{self._sid}] Child TP update")
                     self._trades.update(trade_id, target_order_id=order_id, target_price=limit_price)
+                    log.info(f"[{self._sid}] Child Order | TP update | Price:{limit_price}")
 
             if status == 2:
                 log.info(f"[{self._sid}] Child filled | {order_id}")
