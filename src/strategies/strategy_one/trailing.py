@@ -1,4 +1,5 @@
 import asyncio
+import time 
 from src.logger import log
 from src.core.shm_store import ShmStore
 from src.core.dtypes import MAX_TICKS_PER_SYMBOL
@@ -9,6 +10,9 @@ class TrailingManager:
     def __init__(self, trade_mgr: IActiveTradeManager, executor: BaseExecutor):
         self._trade_mgr   = trade_mgr
         self._executor = executor
+
+        self._last_modify_ts = 0.0
+        self._modify_gap = 20.0  
     
     async def run(self, sym_idx: int, shm: ShmStore, event: asyncio.Event):
         ctrl      = shm.ctrl[sym_idx]
@@ -18,13 +22,12 @@ class TrailingManager:
             await event.wait()
 
             last_read_widx = int(ctrl['tick_widx'])     # ← event fire hone ke waqt se start
-            log.info("TrailingManager: active, ticks watch kar raha hai")
 
             while True:
                 trade = self._trade_mgr.get_active()
                 if trade is None:
                     event.clear()
-                    log.info("TrailingManager: trade closed, so raha hai")
+                    log.info("TrailingManager: trade closed")
                     break
 
                 await asyncio.sleep(0.001)
@@ -48,39 +51,55 @@ class TrailingManager:
                             break
                     # ─────────────────────────────────────────────────
 
-                    await self._check_levels(slot, trade)
+                    await self._check_levels(ltp, trade)
                     last_read_widx = (last_read_widx + 1) % MAX_TICKS_PER_SYMBOL
 
 
-    async def _check_levels(self, tick, active_trade_view):
-        ltp   = float(tick['ltp'])
-        count = int(active_trade_view['trailing_count'])
-        if count == 0:
+    async def _check_levels(self, ltp, active_trade):
+        trailing_lvls = int(active_trade['trailing_count'])
+        side = int(active_trade['side'])
+        
+        if trailing_lvls == 0:
+            log.error("No Trailing Levels Found")
             return
- 
-        stop_oid = active_trade_view['stop_order_id'].tobytes().rstrip(b'\x00').decode()
-        qty      = int(active_trade_view['qty'])
- 
-        for i in range(count):
-            lvl = active_trade_view['trailing'][i]
+
+        trade_id = active_trade['order_id'].tobytes().rstrip(b'\x00').decode()
+        stop_oid = active_trade['stop_order_id'].tobytes().rstrip(b'\x00').decode()
+
+        for i in range(trailing_lvls):
+            lvl = active_trade['trailing'][i]
+            
+            # If trailing level is already hit skip
             if bool(lvl['hit']):
                 continue
+
+            log.info(
+                f"LTP={ltp}, Threshold={float(lvl['threshold'])}, New={float(lvl['new_stop'])}, "
+                f"side={side}, Hit={bool(lvl['hit'])}"
+            )           
  
-            if ltp > float(lvl['threshold']):
+            if ltp > lvl['threshold'] if side == 1 else ltp < lvl['threshold']:
+
+                # Modify Order Cooldown
+                now = time.monotonic()
+                if now - self._last_modify_ts < self._modify_gap:
+                    log.info("Modify cooldown active")
+                    continue
+
+                # Modify Order
                 log.info("I want to place and modify order")
-                trade_id = active_trade_view['order_id'].tobytes().rstrip(b'\x00').decode()
-                self._trade_mgr.mark_trailing_hit(trade_id, i)
-                # res = await self._place.modify_order(
-                #     stop_oid,
-                #     order_type=4,
-                #     limit_price=float(lvl['new_stop']),
-                #     stop_price=float(lvl['new_stop']),
-                #     qty=qty,
-                # )
-                # if res.get('code') == 1102:
-                #     # Hit flag seedha SHM mein likho
-                #     active_trade_view['trailing'][i]['hit'] = True
-                #     log.info(f"TrailingManager: level {i} hit | LTP {ltp}")
-                # else:
-                #     self._log.error(f"TrailingManager: modify failed level {i} | {res}")
- 
+                res = await self._executor.modify_order(
+                    stop_oid,
+                    order_type=4,
+                    limit_price=float(lvl['new_stop']) - 0.10,
+                    stop_price=float(lvl['new_stop']),
+                    qty=int(active_trade['qty']),
+                )
+                if res.get('code') == 1102:
+                    self._trade_mgr.mark_trailing_hit(trade_id, i)
+                    self._last_modify_ts = now
+                    log.info(f"Order Modify")
+                    log.info(f"level {i} hit | LTP {ltp}")
+                else:
+                    log.error(f"TrailingManager: order modify failed level {i} | {res}")
+                    break
