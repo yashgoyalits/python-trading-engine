@@ -182,17 +182,10 @@ class StrategyHandler:
 
     # ── trailing_levels calculation — config se ─────────────────────────────
     def _calc_trailing(self, entry_price: float, side: int) -> list[dict]:
-        if side ==1:
-            stop_price = entry_price - self._stop_loss  
-        else:
-            stop_price = entry_price + self._stop_loss  
-
-        log.info(stop_price)
-
         return [
             {
                 "threshold": entry_price + side * lvl["threshold_offset"],
-                "new_stop":  stop_price + side * lvl['new_stop_offset'],
+                "new_stop":  entry_price + side * lvl['new_stop_offset'],
                 "hit":       False,
             }
             for lvl in self._trailing_cfg
