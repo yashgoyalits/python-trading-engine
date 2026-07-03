@@ -74,9 +74,12 @@ class TrailingManager:
                 continue
 
             log.info(
-                f"LTP={ltp}, Threshold={float(lvl['threshold'])}, New={float(lvl['new_stop'])}, "
-                f"side={side}, Hit={bool(lvl['hit'])}"
-            )           
+                f"LTP={ltp} | Level={i} | "
+                f"Threshold={float(lvl['threshold'])} | "
+                f"New SL={float(lvl['new_stop'])} | "
+                f"Side={side} | "
+                f"Hit={bool(lvl['hit'])}"
+            )          
  
             if ltp > lvl['threshold'] if side == 1 else ltp < lvl['threshold']:
 
@@ -102,4 +105,4 @@ class TrailingManager:
                     log.info(f"level {i} hit | LTP {ltp}")
                 else:
                     log.error(f"TrailingManager: order modify failed level {i} | {res}")
-                    break
+                    self._last_modify_ts = now
