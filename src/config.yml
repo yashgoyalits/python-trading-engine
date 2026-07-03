@@ -26,4 +26,4 @@ strategies:
       - threshold_offset: 2.0
         new_stop_offset: 1.0
       - threshold_offset: 3.0
-        new_stop_offset: 2.0
+        new_stop_offset: 1.5

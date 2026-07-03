@@ -73,36 +73,41 @@ class TrailingManager:
             if bool(lvl['hit']):
                 continue
 
-            log.info(
-                f"LTP={ltp} | Level={i} | "
-                f"Threshold={float(lvl['threshold'])} | "
-                f"New SL={float(lvl['new_stop'])} | "
-                f"Side={side} | "
-                f"Hit={bool(lvl['hit'])}"
-            )          
- 
-            if ltp > lvl['threshold'] if side == 1 else ltp < lvl['threshold']:
+            threshold = float(lvl['threshold'])
+            crossed   = ltp > threshold if side == 1 else ltp < threshold
+            if not crossed:
+                continue
 
-                # Modify Order Cooldown
-                now = time.monotonic()
-                if now - self._last_modify_ts < self._modify_gap:
-                    log.info("Modify cooldown active")
-                    continue
+            # ── Threshold cross ho gaya ───────────────────────
+            new_stop = float(lvl['new_stop'])
 
-                # Modify Order
-                log.info("I want to place and modify order")
-                res = await self._executor.modify_order(
-                    stop_oid,
-                    order_type=4,
-                    limit_price=float(lvl['new_stop']) - 0.10,
-                    stop_price=float(lvl['new_stop']),
-                    qty=int(active_trade['qty']),
+            # ── Cool down ───────────────────────
+            now = time.monotonic()
+            if now - self._last_modify_ts < self._modify_gap:
+                return
+
+            # ── Modify Order Req ───────────────────────
+            res = await self._executor.modify_order(
+                stop_oid,
+                order_type=4,
+                limit_price=new_stop,
+                stop_price=new_stop,
+                qty=int(active_trade['qty']),
+            )
+
+            self._last_modify_ts = time.monotonic()
+
+
+            if res.get('code') == 1102:
+                self._trade_mgr.mark_trailing_hit(trade_id, i)
+                log.info(
+                    f"TrailingManager Order Modify"
+                    f"level={i} ltp={ltp:.2f} threshold={threshold:.2f} new_stop={new_stop:.2f}"
                 )
-                if res.get('code') == 1102:
-                    self._trade_mgr.mark_trailing_hit(trade_id, i)
-                    self._last_modify_ts = now
-                    log.info(f"Order Modify")
-                    log.info(f"level {i} hit | LTP {ltp}")
-                else:
-                    log.error(f"TrailingManager: order modify failed level {i} | {res}")
-                    self._last_modify_ts = now
+            else:
+                log.error(
+                    f"TrailingManager Order Modify failed"
+                    f"level={i} ltp={ltp:.2f} threshold={threshold:.2f} new_stop={new_stop:.2f}"
+                    f"Error:{res}"
+                )
+                
